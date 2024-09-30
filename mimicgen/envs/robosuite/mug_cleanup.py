@@ -21,6 +21,8 @@ from robosuite.models.arenas import TableArena
 from robosuite.models.tasks import ManipulationTask
 from robosuite.utils.placement_samplers import SequentialCompositeSampler, UniformRandomSampler
 from robosuite.utils.observables import Observable, sensor
+from robosuite.models.objects import BallObject, BoxObject
+
 
 import mimicgen
 from mimicgen.models.robosuite.objects import BlenderObject, DrawerObject, LongDrawerObject
@@ -53,7 +55,7 @@ class MugCleanup(SingleArmEnv_MG):
         initialization_noise (dict or list of dict): Dict containing the initialization noise parameters.
             The expected keys and corresponding value types are specified below:
 
-            :`'magnitude'`: The scale factor of uni-variate random noise applied to each of a robot's given initial
+            :`'magnitud e'`: The scale factor of uni-variate random noise applied to each of a robot's given initial
                 joint positions. Setting this value to `None` or 0.0 results in no noise being applied.
                 If "gaussian" type of noise is applied then this magnitude scales the standard deviation applied,
                 If "uniform" type of noise is applied then this magnitude sets the bounds of the sampling range
@@ -167,8 +169,8 @@ class MugCleanup(SingleArmEnv_MG):
         horizon=1000,
         ignore_done=False,
         hard_reset=True,
-        camera_names="agentview",
-        camera_heights=256,
+        camera_names="frontview",
+        camera_heights=100,
         camera_widths=256,
         camera_depths=False,
         camera_segmentations=None,  # {None, instance, class, element}
@@ -273,7 +275,7 @@ class MugCleanup(SingleArmEnv_MG):
         # Add camera with full tabletop perspective
         self._add_agentview_full_camera(mujoco_arena)
 
-        # Set default agentview camera to be "agentview_full" (and send old agentview camera to agentview_full)
+        # # Set default agentview camera to be "agentview_full" (and send old agentview camera to agentview_full)
         old_agentview_camera = find_elements(root=mujoco_arena.worldbody, tags="camera", attribs={"name": "agentview"}, return_first=True)
         old_agentview_camera_pose = (old_agentview_camera.get("pos"), old_agentview_camera.get("quat"))
         old_agentview_full_camera = find_elements(root=mujoco_arena.worldbody, tags="camera", attribs={"name": "agentview_full"}, return_first=True)
@@ -293,7 +295,7 @@ class MugCleanup(SingleArmEnv_MG):
         self._get_drawer_model()
         self._get_object_model()
         # objects = [self.drawer, self.cleanup_object]
-        objects = [self.drawer]
+        objects = [self.drawer, self.cube]
 
         # Create placement initializer
         self._get_placement_initializer()
@@ -371,6 +373,26 @@ class MugCleanup(SingleArmEnv_MG):
             margin=0.001,
         )
 
+        # Create the cube object
+        cube_size = [0.0125, 0.0125, 0.0125]  # Adjust the size to fit inside the mug
+        self.cube = BoxObject(
+            name="cube",
+            size=cube_size,
+            rgba=[0, 1, 0, 1],  # Green color
+            density=1000,
+            friction=(1.0, 0.005, 0.0001),
+        )
+
+        # Create the ball object
+        # ball_radius = 0.02  # Adjust the size to fit inside the mug
+        # self.ball = BallObject(
+        #     name="ball",
+        #     size=[ball_radius],
+        #     rgba=[1, 0, 0, 1],  # Red color
+        #     density=1000,
+        #     friction=(1.0, 0.005, 0.0001),
+        # )
+
     def _get_initial_placement_bounds(self):
         """
         Internal function to get bounds for randomization of initial placements of objects (e.g.
@@ -389,7 +411,13 @@ class MugCleanup(SingleArmEnv_MG):
                 z_rot=(0., 0.),
                 reference=self.table_offset,
             ),
-            object=dict(
+            mug=dict(
+                x=(-0.15, 0.15),
+                y=(-0.25, -0.1),
+                z_rot=(0., 2. * np.pi),
+                reference=self.table_offset,
+            ),
+            cube=dict(
                 x=(-0.15, 0.15),
                 y=(-0.25, -0.1),
                 z_rot=(0., 2. * np.pi),
@@ -417,15 +445,15 @@ class MugCleanup(SingleArmEnv_MG):
         )
         self.placement_initializer.append_sampler(
             sampler=UniformRandomSampler(
-                name="ObjectSampler",
+                name="MugSampler",
                 mujoco_objects=self.cleanup_object,
-                x_range=bounds["object"]["x"],
-                y_range=bounds["object"]["y"],
-                rotation=bounds["object"]["z_rot"],
+                x_range=bounds["mug"]["x"],
+                y_range=bounds["mug"]["y"],
+                rotation=bounds["mug"]["z_rot"],
                 rotation_axis='z',
                 ensure_object_boundary_in_range=False,
                 ensure_valid_placement=True,
-                reference_pos=bounds["object"]["reference"],
+                reference_pos=bounds["mug"]["reference"],
                 z_offset=0.,
             )
         )
@@ -442,6 +470,7 @@ class MugCleanup(SingleArmEnv_MG):
         self.obj_body_id = dict(
             object=self.sim.model.body_name2id(self.cleanup_object.root_body),
             drawer=self.sim.model.body_name2id(self.drawer.root_body),
+            cube=self.sim.model.body_name2id(self.cube.root_body),
         )
         self.drawer_qpos_addr = self.sim.model.get_joint_qpos_addr(self.drawer.joints[0])
         self.drawer_bottom_geom_id = self.sim.model.geom_name2id("DrawerObject_drawer_bottom")
@@ -612,10 +641,113 @@ class MugCleanup(SingleArmEnv_MG):
         if vis_settings["grippers"]:
             self._visualize_gripper_to_target(gripper=self.robots[0].gripper, target=self.cleanup_object)
 
-
 class MugCleanup_D0(MugCleanup):
     """Rename base class for convenience."""
     pass
+
+# region Cube Only
+class MugCleanup_CubeOnly0(MugCleanup):
+
+    def _get_placement_initializer(self):
+        bounds = self._get_initial_placement_bounds()
+
+        self.placement_initializer = SequentialCompositeSampler(name="ObjectSampler")
+        self.placement_initializer.append_sampler(
+            sampler=UniformRandomSampler(
+                name="DrawerSampler",
+                mujoco_objects=self.drawer,
+                x_range=bounds["drawer"]["x"],
+                y_range=bounds["drawer"]["y"],
+                rotation=bounds["drawer"]["z_rot"],
+                rotation_axis='z',
+                ensure_object_boundary_in_range=False,
+                ensure_valid_placement=True,
+                reference_pos=bounds["drawer"]["reference"],
+                z_offset=0.03,
+            )
+        )
+        self.placement_initializer.append_sampler(
+            sampler=UniformRandomSampler(
+                name="MugSampler",
+                mujoco_objects=self.cleanup_object,
+                x_range=(10,10), # Spawn mug far away
+                y_range=(10,10),
+                rotation=bounds["mug"]["z_rot"],
+                rotation_axis='z',
+                ensure_object_boundary_in_range=False,
+                ensure_valid_placement=True,
+                reference_pos=bounds["mug"]["reference"],
+                z_offset=0.,
+            )
+        )
+        self.placement_initializer.append_sampler(
+            sampler=UniformRandomSampler(
+                name="CubeSampler",
+                mujoco_objects=self.cube,
+                x_range=bounds["cube"]["x"],
+                y_range=bounds["cube"]["y"],
+                rotation=bounds["cube"]["z_rot"],
+                rotation_axis='z',
+                ensure_object_boundary_in_range=False,
+                ensure_valid_placement=True,
+                reference_pos=bounds["cube"]["reference"],
+                z_offset=0.03,
+            )
+        )
+
+# region Cube in Mug
+class MugCleanup_CubeInMug0(MugCleanup):
+
+    def _reset_internal(self):
+        super()._reset_internal()
+        self._place_cube_in_mug()
+
+    def _place_cube_in_mug(self):
+        """
+        Place the cube inside the mug after the mug's position has been set.
+        """
+        # Get the mug's position and orientation
+        mug_body_id = self.sim.model.body_name2id(self.cleanup_object.root_body)
+        mug_pos = self.sim.data.body_xpos[mug_body_id]
+        mug_quat = T.convert_quat(self.sim.data.body_xquat[mug_body_id], to='xyzw')
+
+        # Calculate the cube's position relative to the mug
+        # Assuming the mug's opening is along the positive z-axis
+        cube_offset = np.array([0.0, 0.0, -0.01])  # Adjust the offset to place the cube inside the mug
+
+        # Rotate the offset by the mug's orientation
+        cube_offset_rotated = T.quat2mat(mug_quat).dot(cube_offset)
+
+        # Set the cube's position
+        cube_pos = mug_pos + cube_offset_rotated
+        cube_quat = mug_quat  # Align the cube's orientation with the mug's orientation
+
+        # Set the cube's joint position
+        self.sim.data.set_joint_qpos(
+            self.cube.joints[0], np.concatenate([cube_pos, cube_quat])
+        )
+        self.sim.forward()
+
+    def _setup_observables(self):
+        observables = super()._setup_observables()
+
+        if self.use_object_obs:
+            # Get robot prefix and define observables modality
+            pf = self.robots[0].robot_model.naming_prefix
+            modality = "object"
+
+            # Add cube sensors
+            cube_sensors, cube_sensor_names = self._create_obj_sensors(
+                obj_name="cube", modality=modality
+            )
+            for name, s in zip(cube_sensor_names, cube_sensors):
+                observables[name] = Observable(
+                    name=name,
+                    sensor=s,
+                    sampling_rate=self.control_freq,
+                    active=True,
+                )
+        return observables
 
 
 class MugCleanup_D1(MugCleanup_D0):
@@ -638,7 +770,7 @@ class MugCleanup_D1(MugCleanup_D0):
             ),
         )
 
-
+# region MugCleanup_O1
 class MugCleanup_O1(MugCleanup_D0):
     """
     Use different mug.
@@ -653,7 +785,7 @@ class MugCleanup_O1(MugCleanup_D0):
             **kwargs,
         )
 
-
+# region MugCleanup_O2
 class MugCleanup_O2(MugCleanup_D0):
     """
     Use a random mug on each episode reset.

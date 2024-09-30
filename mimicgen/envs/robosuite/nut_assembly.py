@@ -24,7 +24,37 @@ class NutAssembly_D0(NutAssembly, SingleArmEnv_MG):
     Augment robosuite nut assembly task for mimicgen.
     """
     def __init__(self, **kwargs):
-        NutAssembly.__init__(self, **kwargs)
+        assert "placement_initializer" not in kwargs, "this class defines its own placement initializer"
+
+        # make placement initializer here
+        nut_names = ("SquareNut", "RoundNut")
+
+        bounds = self._get_initial_placement_bounds()
+        nut_x_ranges = (bounds["square_nut"]["x"], bounds["round_nut"]["x"])
+        nut_y_ranges = (bounds["square_nut"]["y"], bounds["round_nut"]["y"])
+        nut_z_ranges = (bounds["square_nut"]["z_rot"], bounds["round_nut"]["z_rot"])
+        nut_references = (bounds["square_nut"]["reference"], bounds["round_nut"]["reference"])
+        z_offsets = (0.1, 0.02)
+
+        placement_initializer = SequentialCompositeSampler(name="ObjectSampler")
+        for nut_name, x_range, y_range, z_range, z_offset, ref in zip(nut_names, nut_x_ranges, nut_y_ranges, nut_z_ranges, z_offsets, nut_references):
+            placement_initializer.append_sampler(
+                sampler=UniformRandomSampler(
+                    name=f"{nut_name}Sampler",
+                    x_range=x_range,
+                    y_range=y_range,
+                    rotation=z_range,
+                    rotation_axis='z',
+                    ensure_object_boundary_in_range=False,
+                    ensure_valid_placement=False,
+                    reference_pos=ref,
+                    z_offset=z_offset,
+                )
+            )
+
+        NutAssembly.__init__(self, placement_initializer=placement_initializer, **kwargs)
+
+        # NutAssembly.__init__(self, **kwargs)
 
     def edit_model_xml(self, xml_str):
         # make sure we don't get a conflict for function implementation
@@ -43,17 +73,15 @@ class NutAssembly_D0(NutAssembly, SingleArmEnv_MG):
         """
         return dict(
             square_nut=dict(
-                x=(-0.115, -0.11),
-                y=(0.11, 0.225),
+                x=(0.23, 0.23),
+                y=(-0.1, -0.1),
                 z_rot=(0., 2. * np.pi),
-                # NOTE: hardcoded @self.table_offset since this might be called in init function
                 reference=np.array((0, 0, 0.82)),
             ),
             round_nut=dict(
-                x=(-0.115, -0.11),
-                y=(-0.225, -0.11),
+                x=(0.23, 0.23),
+                y=(-0.1, -0.1),
                 z_rot=(0., 2. * np.pi),
-                # NOTE: hardcoded @self.table_offset since this might be called in init function
                 reference=np.array((0, 0, 0.82)),
             ),
         )
@@ -113,8 +141,8 @@ class Square_D0(NutAssemblySquare, SingleArmEnv_MG):
         """
         return dict(
             nut=dict(
-                x=(-0.115, -0.11),
-                y=(0.11, 0.225),
+                x=(0.23, 0.23),
+                y=(0.1, 0.1),
                 z_rot=(0., 2. * np.pi),
                 # NOTE: hardcoded @self.table_offset since this might be called in init function
                 reference=np.array((0, 0, 0.82)),

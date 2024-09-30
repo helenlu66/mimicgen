@@ -9,6 +9,8 @@ Similar to the demo_random_action.py script from robosuite.
 from robosuite.controllers import load_controller_config
 from robosuite.utils.input_utils import *
 
+import numpy as np
+
 
 def choose_mimicgen_environment():
     """
@@ -22,6 +24,7 @@ def choose_mimicgen_environment():
     try:
         import robosuite_task_zoo
     except ImportError:
+        print("Failed to import robosuite_task_zoo")
         pass
 
     # all base robosuite environments (and maybe robosuite task zoo)
@@ -51,6 +54,7 @@ def choose_mimicgen_environment():
         k = 0
         print("Input is not valid. Use {} by default.\n".format(envs[k]))
 
+    print("Chosen environment: {}\n".format(envs[k]))
     # Return the chosen environment name
     return envs[k]
 
@@ -61,7 +65,7 @@ if __name__ == "__main__":
     options = {}
 
     # Choose environment
-    options["env_name"] = choose_mimicgen_environment()
+    options["env_name"] =  choose_mimicgen_environment()
 
     # Choose robot
     options["robots"] = choose_robots(exclude_bimanual=True)
@@ -80,6 +84,14 @@ if __name__ == "__main__":
     )
     env.reset()
     env.viewer.set_camera(camera_id=0)
+
+    # Get the camera ID for the camera you want to modify (e.g., "frontview")
+    camera_id = env.sim.model.camera_name2id("frontview")
+
+    # Set the new camera position (x, y, z)
+    env.sim.model.cam_pos[camera_id] = np.array([0, 0, 2])  # Modify these values to set the desired position
+    env.sim.model.cam_quat[camera_id] = np.array([0.0, 0, 0, 1])  # Example quaternion
+
 
     # Get action limits
     low, high = env.action_spec

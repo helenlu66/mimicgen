@@ -27,11 +27,9 @@ psutil==6.0.0
 pybullet==3.2.6
 pygame==2.6.0
 pynput==1.7.7
-PyOpenGL==3.1.6
 PyOpenGL==3.1.7
 pyrddl==0.1.10
 pytest==8.3.3
-PyYAML==6.0.2
 PyYAML==6.0.2
 recommonmark==0.7.1
 scipy==1.14.1
