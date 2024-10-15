@@ -38,7 +38,8 @@ def choose_mimicgen_environment():
     only_mimicgen = sorted(all_envs - robosuite_envs)
 
     # keep only envs that correspond to the different reset distributions from the paper
-    envs = [x for x in only_mimicgen if x[-1].isnumeric()]
+    # only keep envs that end with "Novelty"
+    envs = [x for x in only_mimicgen if x[-7:] == "Novelty"]
 
     # Select environment to run
     print("Here is a list of environments in the suite:\n")

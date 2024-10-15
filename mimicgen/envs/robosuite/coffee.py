@@ -22,7 +22,7 @@ from mimicgen.models.robosuite.objects import BlenderObject, CoffeeMachinePodObj
 from mimicgen.envs.robosuite.single_arm_env_mg import SingleArmEnv_MG
 
 
-class Coffee(SingleArmEnv_MG):
+class Coffee_Pre_Novelty(SingleArmEnv_MG):
     """
     This class corresponds to the coffee task for a single robot arm.
 
@@ -768,7 +768,7 @@ class Coffee(SingleArmEnv_MG):
             self._visualize_gripper_to_target(gripper=self.robots[0].gripper, target=self.coffee_machine)
 
 
-class Coffee_D0(Coffee):
+class Coffee_D0(Coffee_Pre_Novelty):
     """Rename base class for convenience."""
     pass
 
@@ -841,7 +841,7 @@ class Coffee_D2(Coffee_D1):
         )
 
 
-class CoffeePreparation(Coffee):
+class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
     """
     Harder coffee task where the task starts with materials in drawer and coffee machine closed. The robot
     needs to retrieve the coffee pod and mug from the drawer, open the coffee machine, place the pod and mug 
@@ -1251,12 +1251,12 @@ class CoffeePreparation(Coffee):
         return metrics
 
 
-class CoffeePreparation_D0(CoffeePreparation):
+class Coffee_Drawer_Novelty_D0(Coffee_Drawer_Novelty):
     """Rename base class for convenience."""
     pass
 
 
-class CoffeePreparation_D1(CoffeePreparation_D0):
+class Coffee_Drawer_Novelty_D1(Coffee_Drawer_Novelty_D0):
     """
     Broader initialization for mug (whole right side of table, with rotation) and
     modest movement for coffee machine (some translation and rotation).

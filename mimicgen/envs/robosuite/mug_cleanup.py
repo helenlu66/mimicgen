@@ -646,7 +646,7 @@ class MugCleanup_D0(MugCleanup):
     pass
 
 # region Cube Only
-class MugCleanup_CubeOnly0(MugCleanup):
+class CubeCleanup_Pre_Novelty(MugCleanup):
 
     def _get_placement_initializer(self):
         bounds = self._get_initial_placement_bounds()
@@ -696,7 +696,7 @@ class MugCleanup_CubeOnly0(MugCleanup):
         )
 
 # region Cube in Mug
-class MugCleanup_CubeInMug0(MugCleanup):
+class CubeCleanup_Mug_Novelty(MugCleanup):
 
     def _reset_internal(self):
         super()._reset_internal()

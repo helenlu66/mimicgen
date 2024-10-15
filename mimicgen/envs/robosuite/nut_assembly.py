@@ -19,7 +19,7 @@ from robosuite.utils import RandomizationError
 from mimicgen.envs.robosuite.single_arm_env_mg import SingleArmEnv_MG
 
 
-class NutAssembly_D0(NutAssembly, SingleArmEnv_MG):
+class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
     """
     Augment robosuite nut assembly task for mimicgen.
     """
@@ -86,36 +86,36 @@ class NutAssembly_D0(NutAssembly, SingleArmEnv_MG):
             ),
         )
     
-class Pre_Novelty_Env1(NutAssembly_D0): 
-    def _get_initial_placement_bounds(self):
-        """
-        Internal function to get bounds for randomization of initial placements of objects (e.g.
-        what happens when env.reset is called). Should return a dictionary with the following
-        structure:
-            object_name
-                x: 2-tuple for low and high values for uniform sampling of x-position
-                y: 2-tuple for low and high values for uniform sampling of y-position
-                z_rot: 2-tuple for low and high values for uniform sampling of z-rotation
-                reference: np array of shape (3,) for reference position in world frame (assumed to be static and not change)
-        """
-        return dict(
-            square_nut=dict(
-                x=(-0.115, -0.11),
-                y=(0.11, 0.225),
-                z_rot=(0., 2. * np.pi),
-                # NOTE: hardcoded @self.table_offset since this might be called in init function
-                reference=np.array((0, 0, 0.82)),
-            ),
-            round_nut=dict(
-                x=(-0.115, -0.11),
-                y=(-0.225, -0.11),
-                z_rot=(0., 2. * np.pi),
-                # NOTE: hardcoded @self.table_offset since this might be called in init function
-                reference=np.array((0, 0, 0.82)),
-            ),
-        )
+# class Pre_Novelty_Env1(NutAssembly_D0): 
+#     def _get_initial_placement_bounds(self):
+#         """
+#         Internal function to get bounds for randomization of initial placements of objects (e.g.
+#         what happens when env.reset is called). Should return a dictionary with the following
+#         structure:
+#             object_name
+#                 x: 2-tuple for low and high values for uniform sampling of x-position
+#                 y: 2-tuple for low and high values for uniform sampling of y-position
+#                 z_rot: 2-tuple for low and high values for uniform sampling of z-rotation
+#                 reference: np array of shape (3,) for reference position in world frame (assumed to be static and not change)
+#         """
+#         return dict(
+#             square_nut=dict(
+#                 x=(-0.115, -0.11),
+#                 y=(0.11, 0.225),
+#                 z_rot=(0., 2. * np.pi),
+#                 # NOTE: hardcoded @self.table_offset since this might be called in init function
+#                 reference=np.array((0, 0, 0.82)),
+#             ),
+#             round_nut=dict(
+#                 x=(-0.115, -0.11),
+#                 y=(-0.225, -0.11),
+#                 z_rot=(0., 2. * np.pi),
+#                 # NOTE: hardcoded @self.table_offset since this might be called in init function
+#                 reference=np.array((0, 0, 0.82)),
+#             ),
+#         )
     
-class Pre_Novelty_Env0(NutAssembly_D0):
+class NutAssembly_D0_Pre_Novelty(NutAssembly_D0_RoundPeg_Novelty):
     def _get_initial_placement_bounds(self):
         """
         Internal function to get bounds for randomization of initial placements of objects (e.g.
