@@ -265,6 +265,7 @@ class Coffee_Pre_Novelty(SingleArmEnv_MG):
         # initialize objects of interest
         self.coffee_pod = CoffeeMachinePodObject(name="coffee_pod")
         self.coffee_machine = CoffeeMachineObject(name="coffee_machine")
+        
         objects = [self.coffee_pod, self.coffee_machine]
 
         # Create placement initializer
@@ -604,7 +605,7 @@ class Coffee_Pre_Novelty(SingleArmEnv_MG):
         lid_check = (hinge_angle < hinge_tolerance)
         return lid_check
 
-    def _check_pod(self):
+    def check_pod(self):
         # pod should be in pod holder
         pod_holder_pos = np.array(self.sim.data.body_xpos[self.obj_body_id["coffee_pod_holder"]])
         pod_pos = np.array(self.sim.data.body_xpos[self.obj_body_id["coffee_pod"]])
@@ -629,7 +630,7 @@ class Coffee_Pre_Novelty(SingleArmEnv_MG):
         metrics = dict()
 
         lid_check = self._check_lid()
-        pod_check = self._check_pod()
+        pod_check = self.check_pod()
 
         # pod should be in pod holder
         pod_holder_pos = np.array(self.sim.data.body_xpos[self.obj_body_id["coffee_pod_holder"]])
@@ -1206,7 +1207,7 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
 
         return observables
 
-    def _check_mug_placement(self):
+    def check_mug_placement(self):
         """
         Returns true if mug has been placed successfully on the coffee machine.
         """
@@ -1240,7 +1241,7 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         )
 
         # whether mug has been placed on coffee machine
-        metrics["mug_place"] = self._check_mug_placement()
+        metrics["mug_place"] = self.check_mug_placement()
 
         # new task success includes mug placement
         metrics["task"] = metrics["task"] and metrics["mug_place"]
