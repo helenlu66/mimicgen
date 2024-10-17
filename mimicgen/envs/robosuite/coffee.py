@@ -604,6 +604,26 @@ class Coffee_Pre_Novelty(SingleArmEnv_MG):
         hinge_angle = self.sim.data.qpos[self.hinge_qpos_addr]
         lid_check = (hinge_angle < hinge_tolerance)
         return lid_check
+    
+    def check_can_flip_up_lid(self):
+        """
+        Returns True if the coffee pod lid can be flipped up.
+        """
+        hinge_tolerance = 90. * np.pi / 180. 
+        hinge_angle = self.sim.data.qpos[self.hinge_qpos_addr]
+        lid_check = (hinge_angle < hinge_tolerance)
+        return lid_check
+    
+    def check_directly_on_table(self, obj_name):
+        """
+        Returns True if the object is directly on the table.
+        """
+        table_z_offset = self.table_offset[2]
+        obj_bounding_box = getattr(self, obj_name).get_bounding_box_half_size()
+        obj_z = self.sim.data.body_xpos[self.obj_body_id[obj_name]][2]
+        obj_bottom_z = obj_z - obj_bounding_box[2]
+        return obj_bottom_z - table_z_offset < 0.01
+    
 
     def check_pod(self):
         # pod should be in pod holder
@@ -1207,6 +1227,53 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
 
         return observables
 
+    def check_in_mug(self, obj_name):
+        """
+        Returns true if object is in the mug.
+        """
+        # get mug's half bounding box and pos
+        mug_half_bounding_box = self.mug.get_bounding_box_half_size()
+        mug_pos = self.sim.data.body_xpos[self.obj_body_id["mug"]]
+        # get object's bounding box and pos
+        obj_half_bounding_box = getattr(self, obj_name).get_bounding_box_half_size()
+        obj_pos = self.sim.data.body_xpos[self.obj_body_id[obj_name]]
+        # check if object is in mug
+        in_mug = np.all(np.abs(mug_pos - obj_pos) <= mug_half_bounding_box - obj_half_bounding_box)
+        return in_mug
+    
+    def check_in_drawer(self, obj_name):
+        """
+        Returns true if object is in the drawer.
+        """
+        # check if object is in contact with the inside of the drawer
+        assert obj_name in ["mug", "coffee_pod"]
+        drawer_bottom_geom = "CabinetObject_drawer_bottom"
+        obj_in_drawer = self.check_contact(drawer_bottom_geom, getattr(self, obj_name))
+        return obj_in_drawer
+
+    
+    def check_drawer_open(self):
+        """
+        Returns true if drawer is open.
+        """
+        return (self.sim.data.qpos[self.cabinet_qpos_addr] <= -0.13)
+    
+    def check_mug_upright(self):
+        """Returns true if mug is upright. """
+        obj_rot = self.sim.data.body_xmat[self.obj_body_id["mug"]].reshape(3, 3)
+        z_axis = obj_rot[:3, 2]
+        dist_to_z_axis = 1. - z_axis[2]
+        return (dist_to_z_axis < 1e-3)
+    
+    def check_mug_under_pod_holder(self):
+        """
+        Returns true if mug is under the pod holder.
+        """
+        # check that the mug is making contact with the coffee machine base plate
+        coffee_base_plate_geom = "coffee_machine_base_g0"
+        mug_on_machine = self.check_contact(coffee_base_plate_geom, self.mug)
+        return mug_on_machine
+    
     def check_mug_placement(self):
         """
         Returns true if mug has been placed successfully on the coffee machine.
@@ -1214,15 +1281,11 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
 
         # check z-axis alignment by checking z unit-vector of obj pose and dot with (0, 0, 1)
         # then take cosine dist (1 - dot-prod)
-        obj_rot = self.sim.data.body_xmat[self.obj_body_id["mug"]].reshape(3, 3)
-        z_axis = obj_rot[:3, 2]
-        dist_to_z_axis = 1. - z_axis[2]
-        mug_upright = (dist_to_z_axis < 1e-3)
+        mug_upright = self.check_mug_upright()
 
         # to check if mug is placed on the machine successfully, we check that the mug is upright, and that it is
         # making contact with the coffee machine base plate
-        coffee_base_plate_geom = "coffee_machine_base_g0"
-        mug_on_machine = self.check_contact(coffee_base_plate_geom, self.mug)
+        mug_on_machine = self.check_mug_under_pod_holder()
 
         return mug_upright and mug_on_machine
 
