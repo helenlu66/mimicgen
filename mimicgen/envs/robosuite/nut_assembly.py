@@ -86,6 +86,56 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             ),
         )
     
+    def check_directly_on_table(self, obj_name):
+        """
+        Check if the object is directly on the table.
+
+        Args:
+            obj_name (str): the object name
+
+        Returns:
+            bool: True if the object is directly on the table
+        """
+        id = 0
+        if obj_name == "round-nut":
+            obj_name = "RoundNut"
+            id = 1
+        elif obj_name == "square-nut":
+            obj_name = "SquareNut"
+            id = 0
+        elif obj_name == "round-peg" or obj_name == "square-peg":
+            return True  # Pegs are always on the table
+        
+        obj_pos = self.sim.data.body_xpos[self.obj_body_id[obj_name]]
+        obj_bottom_z = obj_pos[2] - self.nuts[id].get_bounding_box_half_size()[2]/5
+    
+        return obj_bottom_z - self.table_offset[2] < 0.001
+
+    def check_on_peg(self, nut_name, peg_name):
+        '''
+        Check if the nut is on the peg
+        
+        Args:
+            nut_name (str): The nut
+            peg_name (str): The peg
+
+        Returns:
+            bool: True if the nut is on the peg
+        '''
+
+        if nut_name == "round-nut":
+            nut_name = "RoundNut"
+        elif nut_name == "square-nut":
+            nut_name = "SquareNut"
+
+        if peg_name == "round-peg":
+            peg_id = 1
+        elif peg_name == "square-peg":
+            peg_id = 0
+        
+        nut_pos = self.sim.data.body_xpos[self.obj_body_id[nut_name]]
+        return self.on_peg(nut_pos, peg_id)
+
 # class Pre_Novelty_Env1(NutAssembly_D0): 
 #     def _get_initial_placement_bounds(self):
 #         """
@@ -627,7 +677,6 @@ class Square_D1(Square_D0):
             )
 
         return observables
-
 
 
 class Square_D2(Square_D1):
