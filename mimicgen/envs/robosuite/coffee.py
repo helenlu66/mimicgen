@@ -618,8 +618,15 @@ class Coffee_Pre_Novelty(SingleArmEnv_MG):
         """
         Returns True if the object is directly on the table.
         """
+        if hasattr(self, obj_name):
+            obj_bounding_box = getattr(self, obj_name).get_bounding_box_half_size()
+        elif obj_name == 'coffee_machine_lid':
+            obj_bounding_box = self.coffee_machine.lid_size
+        elif obj_name == 'coffee_pod_holder':
+            obj_bounding_box = self.pod_holder_size
+        elif obj_name == 'drawer':
+            obj_bounding_box = self.cabinet_object.get_bounding_box_half_size()
         table_z_offset = self.table_offset[2]
-        obj_bounding_box = getattr(self, obj_name).get_bounding_box_half_size()
         obj_z = self.sim.data.body_xpos[self.obj_body_id[obj_name]][2]
         obj_bottom_z = obj_z - obj_bounding_box[2]
         return obj_bottom_z - table_z_offset < 0.01

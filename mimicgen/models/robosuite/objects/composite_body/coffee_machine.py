@@ -29,8 +29,8 @@ class CoffeeMachineObject(CompositeBodyObject):
         body_size = body.get_bounding_box_half_size()
         body_location = [0., 0., 0.]
 
-        lid = CoffeeMachineLidObject(name="lid")
-        lid_size = self.lid_size = lid.get_bounding_box_half_size()
+        self.lid = CoffeeMachineLidObject(name="lid")
+        lid_size = self.lid_size = self.lid.get_bounding_box_half_size()
         # add tolerance to allow lid to open fully
         lid_location = [
             body_size[0] - lid_size[0],
@@ -78,7 +78,7 @@ class CoffeeMachineObject(CompositeBodyObject):
             2. * (body_size[2] - lid_size[2] - pod_holder_holder_size[2]),
         ]
 
-        pod_holder = CupObject(
+        self.pod_holder = CupObject(
             name="pod_holder",
             outer_cup_radius=lid_size[0],
             inner_cup_radius=0.025,
@@ -92,7 +92,7 @@ class CoffeeMachineObject(CompositeBodyObject):
             joints=None,
             friction=pod_holder_friction,
         )
-        pod_holder_size = self.pod_holder_size = pod_holder.get_bounding_box_half_size()
+        pod_holder_size = self.pod_holder_size = self.pod_holder.get_bounding_box_half_size()
         # pod_holder_size = self.pod_holder_size = np.array([0.0295, 0.0295, 0.028 ])
         pod_holder_location = [
             body_size[0] - pod_holder_size[0],
@@ -112,7 +112,7 @@ class CoffeeMachineObject(CompositeBodyObject):
             lid,
             base,
             pod_holder_holder,
-            pod_holder,
+            self.pod_holder,
         ]
 
         object_locations = [
