@@ -11,12 +11,11 @@ import os
 import random
 from collections import OrderedDict
 from copy import deepcopy
+
 import numpy as np
 
-from robosuite.utils.mjcf_utils import CustomMaterial, add_material, find_elements, string_to_array
-
 import robosuite.utils.transform_utils as T
-
+from robosuite.utils.mjcf_utils import CustomMaterial, add_material, find_elements, string_to_array
 from robosuite.models.arenas import TableArena
 from robosuite.models.tasks import ManipulationTask
 from robosuite.utils.placement_samplers import SequentialCompositeSampler, UniformRandomSampler
@@ -294,7 +293,7 @@ class MugCleanup(SingleArmEnv_MG):
         # initialize objects of interest
         self._get_drawer_model()
         self._get_object_model()
-        # objects = [self.drawer, self.cleanup_object]
+        # objects = [self.drawer, self.mug]
         objects = [self.drawer, self.cube]
 
         # Create placement initializer
@@ -308,7 +307,7 @@ class MugCleanup(SingleArmEnv_MG):
         )
         # HACK: merge in mug afterwards because its number of geoms may change
         #       and this may break the generate_id_mappings function in task.py
-        self.model.merge_objects([self.cleanup_object]) # add cleanup object to model 
+        self.model.merge_objects([self.mug]) # add cleanup object to model 
 
     def _get_drawer_model(self):
         """
@@ -356,13 +355,13 @@ class MugCleanup(SingleArmEnv_MG):
 
     def _get_object_model(self):
         """
-        Allow subclasses to override which object to pack into drawer - should load into @self.cleanup_object.
+        Allow subclasses to override which object to pack into drawer - should load into @self.mug.
         """
         base_mjcf_path = os.path.join(mimicgen.__path__[0], "models/robosuite/assets/shapenet_core/mugs")
         mjcf_path = os.path.join(base_mjcf_path, "{}/model.xml".format(self._shapenet_id))
 
-        self.cleanup_object = BlenderObject(
-            name="cleanup_object",
+        self.mug = BlenderObject(
+            name="mug",
             mjcf_path=mjcf_path,
             scale=self._shapenet_scale,
             solimp=(0.998, 0.998, 0.001),
@@ -382,16 +381,6 @@ class MugCleanup(SingleArmEnv_MG):
             density=1000,
             friction=(1.0, 0.005, 0.0001),
         )
-
-        # Create the ball object
-        # ball_radius = 0.02  # Adjust the size to fit inside the mug
-        # self.ball = BallObject(
-        #     name="ball",
-        #     size=[ball_radius],
-        #     rgba=[1, 0, 0, 1],  # Red color
-        #     density=1000,
-        #     friction=(1.0, 0.005, 0.0001),
-        # )
 
     def _get_initial_placement_bounds(self):
         """
@@ -446,7 +435,7 @@ class MugCleanup(SingleArmEnv_MG):
         self.placement_initializer.append_sampler(
             sampler=UniformRandomSampler(
                 name="MugSampler",
-                mujoco_objects=self.cleanup_object,
+                mujoco_objects=self.mug,
                 x_range=bounds["mug"]["x"],
                 y_range=bounds["mug"]["y"],
                 rotation=bounds["mug"]["z_rot"],
@@ -465,10 +454,10 @@ class MugCleanup(SingleArmEnv_MG):
         in a flatten array, which is how MuJoCo stores physical simulation data.
         """
         super()._setup_references()
-
+ 
         # Additional object references for this env
         self.obj_body_id = dict(
-            object=self.sim.model.body_name2id(self.cleanup_object.root_body),
+            mug=self.sim.model.body_name2id(self.mug.root_body),
             drawer=self.sim.model.body_name2id(self.drawer.root_body),
             cube=self.sim.model.body_name2id(self.cube.root_body),
         )
@@ -614,14 +603,14 @@ class MugCleanup(SingleArmEnv_MG):
 
         # check z-axis alignment by checking z unit-vector of obj pose and dot with (0, 0, 1)
         # then take cosine dist (1 - dot-prod)
-        obj_rot = self.sim.data.body_xmat[self.obj_body_id["object"]].reshape(3, 3)
+        obj_rot = self.sim.data.body_xmat[self.obj_body_id["mug"]].reshape(3, 3)
         z_axis = obj_rot[:3, 2]
         dist_to_z_axis = 1. - z_axis[2]
         object_upright = (dist_to_z_axis < 1e-3)
 
         # easy way to check for object in drawer - check if object in contact with bottom drawer geom
         drawer_bottom_geom = "DrawerObject_drawer_bottom"
-        object_in_drawer = self.check_contact(drawer_bottom_geom, self.cleanup_object)
+        object_in_drawer = self.check_contact(drawer_bottom_geom, self.mug)
 
         return (object_in_drawer and object_upright and drawer_closed)
 
@@ -639,14 +628,77 @@ class MugCleanup(SingleArmEnv_MG):
 
         # Color the gripper visualization site according to its distance to the cleanup object
         if vis_settings["grippers"]:
-            self._visualize_gripper_to_target(gripper=self.robots[0].gripper, target=self.cleanup_object)
+            self._visualize_gripper_to_target(gripper=self.robots[0].gripper, target=self.mug)
+
+    def check_directly_on_table(self, obj_name):
+        """
+        Check if the object is directly on the table.
+
+        Args:
+            obj_name (str): Name of the object to check
+
+        Returns:
+            bool: True if the object is directly on the table, False otherwise
+        """
+        # Get the object's position
+        obj_pos = self.sim.data.body_xpos[self.obj_body_id[obj_name]]
+        obj_bottom_z = obj_pos[2] - self.mug.get_bounding_box_half_size()[2]
+
+        return obj_bottom_z - self.table_offset[2] < 0.01
+
+    def check_in_drawer(self, obj_name):
+        """
+        Check if the object is in the drawer.
+
+        Args:
+            obj_name (str): Name of the object to check
+
+        Returns:
+            bool: True if the object is in the drawer, False otherwise
+        """
+
+        # Check if the object is in contact with the bottom of the drawer
+        return self.check_contact("DrawerObject_drawer_bottom", self.mug)
+    
+    def check_in_mug(self, obj_name):
+        """
+        Check if the object is in the mug.
+
+        Args:
+            obj_name (str): Name of the object to check
+
+        Returns:
+            bool: True if the object is in the mug, False otherwise
+        """
+
+        # get mug's half bounding box and pos
+        mug_half_bounding_box = self.mug.get_bounding_box_half_size()
+        mug_pos = self.sim.data.body_xpos[self.obj_body_id["mug"]]
+        # get object's bounding box and pos
+        obj_half_bounding_box = getattr(self, obj_name).get_bounding_box_half_size()
+        obj_pos = self.sim.data.body_xpos[self.obj_body_id[obj_name]]
+        # check if object is in mug
+        in_mug = np.all(np.abs(mug_pos - obj_pos) <= mug_half_bounding_box - obj_half_bounding_box)
+        return in_mug
+    
+    def check_drawer_open(self):
+        """
+        Check if the drawer is open.
+
+        Returns:
+            bool: True if the drawer is open, False otherwise
+        """
+        return self.sim.data.qpos[self.drawer_qpos_addr] < -0.01
 
 class MugCleanup_D0(MugCleanup):
     """Rename base class for convenience."""
     pass
 
-# region Cube Only
+# region CubeCleanup_Pre_Novelty
 class CubeCleanup_Pre_Novelty(MugCleanup):
+
+    def check_directly_on_table(self, obj_name):
+        return super().check_directly_on_table(obj_name)
 
     def _get_placement_initializer(self):
         bounds = self._get_initial_placement_bounds()
@@ -669,7 +721,7 @@ class CubeCleanup_Pre_Novelty(MugCleanup):
         self.placement_initializer.append_sampler(
             sampler=UniformRandomSampler(
                 name="MugSampler",
-                mujoco_objects=self.cleanup_object,
+                mujoco_objects=self.mug,
                 x_range=(10,10), # Spawn mug far away
                 y_range=(10,10),
                 rotation=bounds["mug"]["z_rot"],
@@ -695,7 +747,7 @@ class CubeCleanup_Pre_Novelty(MugCleanup):
             )
         )
 
-# region Cube in Mug
+# region CubeCleanup_Mug_Novelty
 class CubeCleanup_Mug_Novelty(MugCleanup):
 
     def _reset_internal(self):
@@ -707,7 +759,7 @@ class CubeCleanup_Mug_Novelty(MugCleanup):
         Place the cube inside the mug after the mug's position has been set.
         """
         # Get the mug's position and orientation
-        mug_body_id = self.sim.model.body_name2id(self.cleanup_object.root_body)
+        mug_body_id = self.sim.model.body_name2id(self.mug.root_body)
         mug_pos = self.sim.data.body_xpos[mug_body_id]
         mug_quat = T.convert_quat(self.sim.data.body_xquat[mug_body_id], to='xyzw')
 
@@ -749,7 +801,7 @@ class CubeCleanup_Mug_Novelty(MugCleanup):
                 )
         return observables
 
-
+# region MugCleanup_D1
 class MugCleanup_D1(MugCleanup_D0):
     """
     Wider initialization for both drawer and object.
@@ -769,6 +821,9 @@ class MugCleanup_D1(MugCleanup_D0):
                 reference=self.table_offset,
             ),
         )
+    
+    def check_direcctly_on_table(self, obj_name):
+        return super().check_direcctly_on_table(obj_name)
 
 # region MugCleanup_O1
 class MugCleanup_O1(MugCleanup_D0):
@@ -814,13 +869,13 @@ class MugCleanup_O2(MugCleanup_D0):
 
     def _get_object_model(self):
         """
-        Allow subclasses to override which object to pack into drawer - should load into @self.cleanup_object.
+        Allow subclasses to override which object to pack into drawer - should load into @self.mug.
         """
         self._shapenet_id, self._shapenet_scale = random.choice(self._assets)
         mjcf_path = os.path.join(self._base_mjcf_path, "{}/model.xml".format(self._shapenet_id))
 
-        self.cleanup_object = BlenderObject(
-            name="cleanup_object",
+        self.mug = BlenderObject(
+            name="mug",
             mjcf_path=mjcf_path,
             scale=self._shapenet_scale,
             solimp=(0.998, 0.998, 0.001),
