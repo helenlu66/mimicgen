@@ -680,15 +680,16 @@ class MugCleanup(SingleArmEnv_MG):
         """
 
         # get mug's half bounding box and pos
-        # mug_half_bounding_box = self.mug.get_bounding_box_half_size()
-        # mug_pos = self.sim.data.body_xpos[self.obj_body_id["mug"]]
-        # # get object's bounding box and pos
-        # obj_half_bounding_box = getattr(self, obj_name).get_bounding_box_half_size()
-        # obj_pos = self.sim.data.body_xpos[self.obj_body_id[obj_name]]
-        # # check if object is in mug
-        # in_mug = np.all(np.abs(mug_pos - obj_pos) <= mug_half_bounding_box - obj_half_bounding_box)
-        # return in_mug
-        return self.check_contact(self.mug, self.cube) 
+        mug_half_bounding_box = self.mug.get_bounding_box_half_size()
+        mug_pos = self.sim.data.body_xpos[self.obj_body_id["mug"]]
+        # get object's bounding box and pos
+        obj_half_bounding_box = getattr(self, obj_name).get_bounding_box_half_size()
+        obj_pos = self.sim.data.body_xpos[self.obj_body_id[obj_name]]
+        # check if object is in mug
+        in_mug = np.all(np.abs(mug_pos - obj_pos) <= mug_half_bounding_box - obj_half_bounding_box)
+        return in_mug
+        # optional contact based method that I don't think works as well.
+        # return self.check_contact(self.mug, self.cube) 
     
     def check_drawer_open(self):
         """
