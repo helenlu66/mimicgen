@@ -96,20 +96,33 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
         Returns:
             bool: True if the object is directly on the table
         """
-        id = 0
         if obj_name == "round-nut":
-            obj_name = "RoundNut"
-            id = 1
+            round_nut_geoms = ["RoundNut_g0", "RoundNut_g1", "RoundNut_g2", "RoundNut_g3", 
+                "RoundNut_g4", "RoundNut_g5", "RoundNut_g6", "RoundNut_g7", "RoundNut_g8"]
+            return any(self.check_contact(geom, 'table_collision') for geom in round_nut_geoms)     
         elif obj_name == "square-nut":
-            obj_name = "SquareNut"
-            id = 0
+            square_nut_geoms = ["SquareNut_g0", "SquareNut_g1", "SquareNut_g2", "SquareNut_g3", 
+                "SquareNut_g4"]
+            return any(self.check_contact(geom, 'table_collision') for geom in square_nut_geoms)
         elif obj_name == "round-peg" or obj_name == "square-peg":
             return True  # Pegs are always on the table
+        else:
+            raise ValueError("Invalid object name: {}".format(obj_name))
+
+        # id = 0
+        # if obj_name == "round-nut":
+        #     obj_name = "RoundNut"
+        #     id = 1
+        # elif obj_name == "square-nut":
+        #     obj_name = "SquareNut"
+        #     id = 0
+        # elif obj_name == "round-peg" or obj_name == "square-peg":
+        #     return True  # Pegs are always on the table
         
-        obj_pos = self.sim.data.body_xpos[self.obj_body_id[obj_name]]
-        obj_bottom_z = obj_pos[2] - self.nuts[id].get_bounding_box_half_size()[2]/5
+        # obj_pos = self.sim.data.body_xpos[self.obj_body_id[obj_name]]
+        # obj_bottom_z = obj_pos[2] - self.nuts[id].get_bounding_box_half_size()[2]/5
     
-        return obj_bottom_z - self.table_offset[2] < 0.001
+        # return obj_bottom_z - self.table_offset[2] < 0.001
 
     def check_on_peg(self, nut_name, peg_name):
         '''

@@ -640,11 +640,14 @@ class MugCleanup(SingleArmEnv_MG):
         Returns:
             bool: True if the object is directly on the table, False otherwise
         """
-        # Get the object's position
-        obj_pos = self.sim.data.body_xpos[self.obj_body_id[obj_name]]
-        obj_bottom_z = obj_pos[2] - self.mug.get_bounding_box_half_size()[2]
-
-        return obj_bottom_z - self.table_offset[2] < 0.01
+        if obj_name == "mug":
+            return self.check_contact(self.mug, 'table_collision')      
+        elif obj_name == "cube":
+            return self.check_contact(self.cube, 'table_collision') 
+        elif obj_name == "drawer":
+            return True 
+        else:
+            raise ValueError("Invalid object name: {}".format(obj_name))
 
     def check_in_drawer(self, obj_name):
         """
@@ -658,8 +661,13 @@ class MugCleanup(SingleArmEnv_MG):
         """
 
         # Check if the object is in contact with the bottom of the drawer
-        return self.check_contact("DrawerObject_drawer_bottom", self.mug)
-    
+        if obj_name == "mug":
+            return self.check_contact(self.mug, "DrawerObject_drawer_bottom")
+        elif obj_name == "cube":
+            return self.check_contact(self.cube, "DrawerObject_drawer_bottom")
+        else:
+            raise ValueError("Invalid object name: {}".format(obj_name))
+            
     def check_in_mug(self, obj_name):
         """
         Check if the object is in the mug.
@@ -672,14 +680,15 @@ class MugCleanup(SingleArmEnv_MG):
         """
 
         # get mug's half bounding box and pos
-        mug_half_bounding_box = self.mug.get_bounding_box_half_size()
-        mug_pos = self.sim.data.body_xpos[self.obj_body_id["mug"]]
-        # get object's bounding box and pos
-        obj_half_bounding_box = getattr(self, obj_name).get_bounding_box_half_size()
-        obj_pos = self.sim.data.body_xpos[self.obj_body_id[obj_name]]
-        # check if object is in mug
-        in_mug = np.all(np.abs(mug_pos - obj_pos) <= mug_half_bounding_box - obj_half_bounding_box)
-        return in_mug
+        # mug_half_bounding_box = self.mug.get_bounding_box_half_size()
+        # mug_pos = self.sim.data.body_xpos[self.obj_body_id["mug"]]
+        # # get object's bounding box and pos
+        # obj_half_bounding_box = getattr(self, obj_name).get_bounding_box_half_size()
+        # obj_pos = self.sim.data.body_xpos[self.obj_body_id[obj_name]]
+        # # check if object is in mug
+        # in_mug = np.all(np.abs(mug_pos - obj_pos) <= mug_half_bounding_box - obj_half_bounding_box)
+        # return in_mug
+        return self.check_contact(self.mug, self.cube) 
     
     def check_drawer_open(self):
         """
