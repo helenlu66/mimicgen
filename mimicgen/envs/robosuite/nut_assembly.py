@@ -251,13 +251,6 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             actives = [True]
 
             @sensor(modality=modality)
-            def square_peg1_bottom_to_top(obs_cache):
-                return -self.square_peg_size[2]
-            sensors += [square_peg1_bottom_to_top]
-            names += ["square-peg1_bottom_to_top"]
-            actives += [True]
-
-            @sensor(modality=modality)
             def square_peg1_quat(obs_cache):
                 return np.array(self.sim.data.body_xquat[square_peg_id])
             sensors += [square_peg1_quat]
@@ -269,13 +262,6 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
                 return np.array(self.sim.data.body_xpos[round_peg_id])
             sensors += [round_peg1_pos]
             names += ["round-peg1_pos"]
-            actives += [True]
-
-            @sensor(modality=modality)
-            def round_peg1_bottom_to_top(obs_cache):
-                return -self.round_peg_size[1]
-            sensors += [round_peg1_bottom_to_top]
-            names += ["round-peg1_bottom_to_top"]
             actives += [True]
 
             @sensor(modality=modality)
@@ -347,6 +333,20 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             actives += [True]
 
             @sensor(modality=modality)
+            def square_nut_to_square_peg_top_max_lift_height(obs_cache):
+                return self.square_peg_size[2]
+            sensors += [square_nut_to_square_peg_top_max_lift_height]
+            names += ["square-nut1_to_square-peg1_top_max_lift_height"]
+            actives += [True]
+
+            @sensor(modality=modality)
+            def square_nut_to_round_peg_top_max_lift_height(obs_cache):
+                return self.round_peg_size[1]
+            sensors += [square_nut_to_round_peg_top_max_lift_height]
+            names += ["square-nut1_to_round-peg1_top_max_lift_height"]
+            actives += [True]
+
+            @sensor(modality=modality)
             def square_nut_to_round_peg_top(obs_cache):
                 square_nut_pos = np.copy(self.sim.data.body_xpos[square_nut_id])
                 round_peg_pos = np.copy(self.sim.data.body_xpos[round_peg_id])
@@ -388,6 +388,20 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
                 return bottom_of_round_nut - top_of_round_peg
             sensors += [round_nut_to_round_peg_top]
             names += ["round-nut1_to_round-peg1_top"]
+            actives += [True]
+
+            @sensor(modality=modality)
+            def round_nut_to_round_peg_top_max_lift_height(obs_cache):
+                return self.round_peg_size[1]
+            sensors += [round_nut_to_round_peg_top_max_lift_height]
+            names += ["round-nut1_to_round-peg1_top_max_lift_height"]
+            actives += [True]
+
+            @sensor(modality=modality)
+            def round_nut_to_square_peg_top_max_lift_height(obs_cache):
+                return self.square_peg_size[2]
+            sensors += [round_nut_to_square_peg_top_max_lift_height]
+            names += ["round-nut1_to_square-peg1_top_max_lift_height"]
             actives += [True]
             
             # Create observables
