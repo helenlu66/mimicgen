@@ -251,10 +251,10 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             actives = [True]
 
             @sensor(modality=modality)
-            def square_peg1_height(obs_cache):
-                return self.square_peg_size[2]
-            sensors += [square_peg1_height]
-            names += ["square-peg1_height"]
+            def square_peg1_bottom_to_top(obs_cache):
+                return -self.square_peg_size[2]
+            sensors += [square_peg1_bottom_to_top]
+            names += ["square-peg1_bottom_to_top"]
             actives += [True]
 
             @sensor(modality=modality)
@@ -272,10 +272,10 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             actives += [True]
 
             @sensor(modality=modality)
-            def round_peg1_height(obs_cache):
-                return self.round_peg_size[1]
-            sensors += [round_peg1_height]
-            names += ["round-peg1_height"]
+            def round_peg1_bottom_to_top(obs_cache):
+                return -self.round_peg_size[1]
+            sensors += [round_peg1_bottom_to_top]
+            names += ["round-peg1_bottom_to_top"]
             actives += [True]
 
             @sensor(modality=modality)
