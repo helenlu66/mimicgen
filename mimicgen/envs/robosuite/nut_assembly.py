@@ -242,12 +242,20 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             gripper_id = self.sim.model.body_name2id("gripper0_eef")
             table_id = self.sim.model.body_name2id("table")
 
+
             @sensor(modality=modality)
             def square_peg1_pos(obs_cache):
                 return np.array(self.sim.data.body_xpos[square_peg_id])
             sensors = [square_peg1_pos]
             names = ["square-peg1_pos"]
             actives = [True]
+
+            @sensor(modality=modality)
+            def square_peg1_height(obs_cache):
+                return self.square_peg_size[2]
+            sensors += [square_peg1_height]
+            names += ["square-peg1_height"]
+            actives += [True]
 
             @sensor(modality=modality)
             def square_peg1_quat(obs_cache):
@@ -264,10 +272,28 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             actives += [True]
 
             @sensor(modality=modality)
+            def round_peg1_height(obs_cache):
+                return self.round_peg_size[1]
+            sensors += [round_peg1_height]
+            names += ["round-peg1_height"]
+            actives += [True]
+
+            @sensor(modality=modality)
             def round_peg1_quat(obs_cache):
                 return np.array(self.sim.data.body_xquat[round_peg_id])
             sensors += [round_peg1_quat]
             names += ["round-peg1_quat"]
+            actives += [True]
+
+            @sensor(modality=modality)
+            def gripper1_to_obj_max_absolute_dist(obs_cache):
+                table_size = self.model.mujoco_arena.table_full_size
+                # assume the highest the robot can reach is 1.0m above the table
+                max_dist = [dist for dist in table_size]  # copy the table size
+                max_dist[2] += 1.0
+                return max_dist
+            sensors += [gripper1_to_obj_max_absolute_dist]
+            names += ["gripper1_to_obj_max_absolute_dist"]
             actives += [True]
 
             @sensor(modality=modality)
