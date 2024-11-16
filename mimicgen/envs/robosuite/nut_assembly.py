@@ -15,13 +15,31 @@ from robosuite.utils.placement_samplers import SequentialCompositeSampler, Unifo
 from robosuite.utils.observables import Observable, sensor
 from robosuite.utils.mjcf_utils import array_to_string, string_to_array, find_elements
 from robosuite.utils import RandomizationError
+from robosuite.utils.transform_utils import quat_distance
+
 
 from mimicgen.envs.robosuite.single_arm_env_mg import SingleArmEnv_MG
 
-
+#region Novelty Environment 
 class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
-    """
-    Augment robosuite nut assembly task for mimicgen.
+    """Class NutAssembly_D0_RoundPeg_Novelty
+    Augments the robosuite nut assembly task for mimicgen.
+    Methods:
+        __init__(**kwargs):
+            Initializes the NutAssembly_D0_RoundPeg_Novelty class with a custom placement initializer.
+        edit_model_xml(xml_str):
+            Edits the model XML string to avoid conflicts in function implementation.
+        _get_initial_placement_bounds():
+            Internal function to get bounds for randomization of initial placements of objects.
+            Returns a dictionary with the structure:
+                    reference: np array of shape (3,) for reference position in world frame
+        check_directly_on_table(obj_name):
+            Checks if the specified object is directly on the table.
+                obj_name (str): The object name
+        check_on_peg(nut_name, peg_name):
+            Checks if the specified nut is on the specified peg.
+                nut_name (str): The nut name
+                peg_name (str): The peg name
     """
     def __init__(self, **kwargs):
         assert "placement_initializer" not in kwargs, "this class defines its own placement initializer"
@@ -54,7 +72,9 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
 
         NutAssembly.__init__(self, placement_initializer=placement_initializer, **kwargs)
 
-        # NutAssembly.__init__(self, **kwargs)
+        self.rename_observables()
+
+    
 
     def edit_model_xml(self, xml_str):
         # make sure we don't get a conflict for function implementation
@@ -84,8 +104,279 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
                 z_rot=(0., 2. * np.pi),
                 reference=np.array((0, 0, 0.82)),
             ),
+            square_peg=dict(
+                x=(0.23, 0.23),
+                y=(-0.1, -0.1),
+                z_rot=(0., 0.),
+                reference=np.array((0, 0, 0.82)),
+            ),
+        )
+
+    def _load_arena(self):
+        """
+        Allow subclasses to easily override arena settings.
+        """
+
+        # load model for table top workspace
+        mujoco_arena = PegsArena(
+            table_full_size=self.table_full_size,
+            table_friction=self.table_friction,
+            table_offset=self.table_offset,
+        )
+
+        # Arena always gets set to zero origin
+        mujoco_arena.set_origin([0, 0, 0])
+
+        return mujoco_arena
+    
+
+    def _load_model(self):
+        """
+        Override to modify xml of pegs. This is necessary because the pegs don't have free
+        joints, so we must modify the xml directly before loading the model.
+        """
+
+        # skip superclass implementation 
+        SingleArmEnv._load_model(self)
+
+        # Adjust base pose accordingly
+        xpos = self.robots[0].robot_model.base_xpos_offset["table"](self.table_full_size[0])
+        self.robots[0].robot_model.set_base_xpos(xpos)
+
+        # load model for table top workspace
+        mujoco_arena = self._load_arena()
+
+        # define nuts
+        self.nuts = []
+        nut_names = ("SquareNut", "RoundNut")
+
+        # super class should already give us placement initializer in init
+        assert self.placement_initializer is not None
+
+        # Reset sampler before adding any new samplers / objects
+        self.placement_initializer.reset()
+
+        for i, (nut_cls, nut_name) in enumerate(zip(
+                (SquareNutObject, RoundNutObject),
+                nut_names,
+        )):
+            nut = nut_cls(name=nut_name)
+            self.nuts.append(nut)
+            # Add this nut to the placement initializer
+            if isinstance(self.placement_initializer, SequentialCompositeSampler):
+                # assumes we have two samplers so we add nuts to them
+                self.placement_initializer.add_objects_to_sampler(sampler_name=f"{nut_name}Sampler", mujoco_objects=nut)
+            else:
+                # This is assumed to be a flat sampler, so we just add all nuts to this sampler
+                self.placement_initializer.add_objects(nut)
+
+        # get xml element corresponding to both pegs
+        square_peg_xml = mujoco_arena.worldbody.find("./body[@name='peg1']")
+        round_peg_xml = mujoco_arena.worldbody.find("./body[@name='peg2']")
+
+        # apply randomization
+        # square_peg_xml_pos = string_to_array(square_peg_xml.get("pos"))
+        # peg_bounds = self._get_initial_placement_bounds()["peg"]
+
+        # sample_x = np.random.uniform(low=peg_bounds["x"][0], high=peg_bounds["x"][1])
+        # sample_y = np.random.uniform(low=peg_bounds["y"][0], high=peg_bounds["y"][1])
+        # sample_z_rot = np.random.uniform(low=peg_bounds["z_rot"][0], high=peg_bounds["z_rot"][1])
+        # square_peg_xml_pos[0] = peg_bounds["reference"][0] + sample_x
+        # square_peg_xml_pos[1] = peg_bounds["reference"][1] + sample_y
+        # square_peg_xml_quat = np.array([np.cos(sample_z_rot / 2), 0, 0, np.sin(sample_z_rot / 2)])
+
+        # round_peg_xml_pos = string_to_array(round_peg_xml.get("pos"))
+
+        # # set modified entry in xml
+        # square_peg_xml.set("pos", array_to_string(square_peg_xml_pos))
+        # square_peg_xml.set("quat", array_to_string(square_peg_xml_quat))
+        # round_peg_xml.set("pos", array_to_string(round_peg_xml_pos))
+
+        # get collision checking entries
+        self.square_peg_size = string_to_array(square_peg_xml.find("./geom").get("size"))
+        self.round_peg_size = string_to_array(round_peg_xml.find("./geom").get("size"))
+        self.square_peg_horizontal_radius = np.linalg.norm(self.square_peg_size[0:2], 2)
+        self.round_peg_horizontal_radius = np.linalg.norm(self.round_peg_size[0:2], 2)
+
+        # task includes arena, robot, and objects of interest
+        self.model = ManipulationTask(
+            mujoco_arena=mujoco_arena,
+            mujoco_robots=[robot.robot_model for robot in self.robots], 
+            mujoco_objects=self.nuts,
         )
     
+    #region Nov Observers
+    def rename_observables(self):
+        """
+        Make copies of the observables with names that match the planning domain.
+        """
+        # Positions and orientations of objects
+        self._observables['gripper1_pos'] = self._observables['robot0_eef_pos']
+        self._observables['gripper1_quat'] = self._observables['robot0_eef_quat']
+        self._observables['square-nut1_pos'] = self._observables['SquareNut_pos']
+        self._observables['square-nut1_quat'] = self._observables['SquareNut_quat']
+        self._observables['round-nut1_pos'] = self._observables['RoundNut_pos']
+        self._observables['round-nut1_quat'] = self._observables['RoundNut_quat']
+        
+        # Distances between gripper and objects
+        self._observables['gripper1_to_square-nut1_dist'] = self._observables['SquareNut_to_robot0_eef_pos']
+        self._observables['gripper1_to_square-nut1_quat'] = self._observables['SquareNut_to_robot0_eef_quat']
+        self._observables['gripper1_to_round-nut1_dist'] = self._observables['RoundNut_to_robot0_eef_pos']
+        self._observables['gripper1_to_round-nut1_quat'] = self._observables['RoundNut_to_robot0_eef_quat']
+
+
+    def _setup_observables(self):
+        """
+        Add in peg-related observables, since the peg moves now.
+        For now, just try adding peg position.
+        """
+        observables = super()._setup_observables()
+
+        # low-level object information
+        if self.use_object_obs:
+            modality = "object"
+            square_nut_id = self.sim.model.body_name2id("SquareNut_main")
+            round_nut_id = self.sim.model.body_name2id("RoundNut_main")
+            square_peg_id = self.sim.model.body_name2id("peg1")
+            round_peg_id = self.sim.model.body_name2id("peg2")
+            gripper_id = self.sim.model.body_name2id("gripper0_eef")
+            table_id = self.sim.model.body_name2id("table")
+
+            @sensor(modality=modality)
+            def square_peg1_pos(obs_cache):
+                return np.array(self.sim.data.body_xpos[square_peg_id])
+            sensors = [square_peg1_pos]
+            names = ["square-peg1_pos"]
+            actives = [True]
+
+            @sensor(modality=modality)
+            def square_peg1_quat(obs_cache):
+                return np.array(self.sim.data.body_xquat[square_peg_id])
+            sensors += [square_peg1_quat]
+            names += ["square-peg1_quat"]
+            actives += [True]
+
+            @sensor(modality=modality)
+            def round_peg1_pos(obs_cache):
+                return np.array(self.sim.data.body_xpos[round_peg_id])
+            sensors += [round_peg1_pos]
+            names += ["round-peg1_pos"]
+            actives += [True]
+
+            @sensor(modality=modality)
+            def round_peg1_quat(obs_cache):
+                return np.array(self.sim.data.body_xquat[round_peg_id])
+            sensors += [round_peg1_quat]
+            names += ["round-peg1_quat"]
+            actives += [True]
+
+            @sensor(modality=modality)
+            def gripper1_to_square_peg1_dist(obs_cache):
+                gripper_pos = self.sim.data.body_xpos[gripper_id]
+                peg_pos = self.sim.data.body_xpos[square_peg_id]
+                return np.linalg.norm(gripper_pos - peg_pos)
+            sensors += [gripper1_to_square_peg1_dist]
+            names += ["gripper1_to_square-peg1_dist"]
+            actives += [True]
+
+            @sensor(modality=modality)
+            def gripper1_to_square_peg1_quat(obs_cache):
+                gripper_quat = self.sim.data.body_xquat[gripper_id]
+                peg_quat = self.sim.data.body_xquat[square_peg_id]
+                return quat_distance(gripper_quat, peg_quat)
+            sensors += [gripper1_to_square_peg1_quat]
+            names += ["gripper1_to_square-peg1_quat"]
+            actives += [True]
+
+            @sensor(modality=modality)
+            def gripper1_to_round_peg1_dist(obs_cache):
+                gripper_pos = self.sim.data.body_xpos[gripper_id]
+                peg_pos = self.sim.data.body_xpos[round_peg_id]
+                return np.linalg.norm(gripper_pos - peg_pos)
+            sensors += [gripper1_to_round_peg1_dist]
+            names += ["gripper1_to_round-peg1_dist"]
+            actives += [True]
+
+            @sensor(modality=modality)
+            def gripper1_to_round_peg1_quat(obs_cache):
+                gripper_quat = self.sim.data.body_xquat[gripper_id]
+                peg_quat = self.sim.data.body_xquat[round_peg_id]
+                return quat_distance(gripper_quat, peg_quat)
+            sensors += [gripper1_to_round_peg1_quat]
+            names += ["gripper1_to_round-peg1_quat"]
+            actives += [True]
+
+            @sensor(modality=modality)
+            def square_nut_to_square_peg_top(obs_cache):
+                square_nut_pos = np.copy(self.sim.data.body_xpos[square_nut_id])
+                square_peg_pos = np.copy(self.sim.data.body_xpos[square_peg_id])
+
+                bottom_of_square_nut = square_nut_pos - [0, 0, 0.01]
+                top_of_square_peg = square_peg_pos
+                top_of_square_peg[2] = self.square_peg_size[2] + square_peg_pos[2] 
+                
+                return bottom_of_square_nut - top_of_square_peg
+            sensors += [square_nut_to_square_peg_top]
+            names += ["square-nut1_to_square-peg1_top"]
+            actives += [True]
+
+            @sensor(modality=modality)
+            def square_nut_to_round_peg_top(obs_cache):
+                square_nut_pos = np.copy(self.sim.data.body_xpos[square_nut_id])
+                round_peg_pos = np.copy(self.sim.data.body_xpos[round_peg_id])
+
+                bottom_of_square_nut = square_nut_pos - [0, 0, 0.01]
+                top_of_round_peg = round_peg_pos
+                top_of_round_peg[2] = self.round_peg_size[1] + round_peg_pos[2]  # index 1 is the height because index 0 is radius
+                
+                return bottom_of_square_nut - top_of_round_peg
+            sensors += [square_nut_to_round_peg_top]
+            names += ["square-nut1_to_round-peg1_top"]
+            actives += [True]
+
+            @sensor(modality=modality)
+            def round_nut_to_square_peg_top(obs_cache):
+                round_nut_pos = np.copy(self.sim.data.body_xpos[round_nut_id])
+                square_peg_pos = np.copy(self.sim.data.body_xpos[square_peg_id])
+
+                #get the heights of the objects
+                bottom_of_round_nut = round_nut_pos - [0, 0, 0.01] #something is wrong with these offsets self.nuts[1].top_offset
+                top_of_square_peg = square_peg_pos
+                top_of_square_peg[2] = self.square_peg_size[2] + square_peg_pos[2] 
+
+                return bottom_of_round_nut - top_of_square_peg
+            sensors += [round_nut_to_square_peg_top]
+            names += ["round-nut1_to_square-peg1_top"]
+            actives += [True]
+
+            @sensor(modality=modality)
+            def round_nut_to_round_peg_top(obs_cache):
+                round_nut_pos = np.copy(self.sim.data.body_xpos[round_nut_id])
+                round_peg_pos = np.copy(self.sim.data.body_xpos[round_peg_id])
+
+                #get the heights of the objects
+                bottom_of_round_nut = round_nut_pos - [0, 0, 0.01] #something is wrong with these offsets self.nuts[1].top_offset
+                top_of_round_peg = round_peg_pos
+                top_of_round_peg[2] = self.round_peg_size[1] + round_peg_pos[2]  # index 1 is the height because index 0 is radius
+
+                return bottom_of_round_nut - top_of_round_peg
+            sensors += [round_nut_to_round_peg_top]
+            names += ["round-nut1_to_round-peg1_top"]
+            actives += [True]
+            
+            # Create observables
+            for name, s, active in zip(names, sensors, actives):
+                observables[name] = Observable(
+                    name=name,
+                    sensor=s,
+                    sampling_rate=self.control_freq,
+                    active=active,
+                )
+
+        return observables
+
+    
+    #region Novelty Detectors
     def check_directly_on_table(self, obj_name):
         """
         Check if the object is directly on the table.
@@ -109,21 +400,6 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
         else:
             raise ValueError("Invalid object name: {}".format(obj_name))
 
-        # id = 0
-        # if obj_name == "round-nut":
-        #     obj_name = "RoundNut"
-        #     id = 1
-        # elif obj_name == "square-nut":
-        #     obj_name = "SquareNut"
-        #     id = 0
-        # elif obj_name == "round-peg" or obj_name == "square-peg":
-        #     return True  # Pegs are always on the table
-        
-        # obj_pos = self.sim.data.body_xpos[self.obj_body_id[obj_name]]
-        # obj_bottom_z = obj_pos[2] - self.nuts[id].get_bounding_box_half_size()[2]/5
-    
-        # return obj_bottom_z - self.table_offset[2] < 0.001
-
     def check_on_peg(self, nut_name, peg_name):
         '''
         Check if the nut is on the peg
@@ -135,7 +411,6 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
         Returns:
             bool: True if the nut is on the peg
         '''
-
         if nut_name == "round-nut":
             nut_name = "RoundNut"
         elif nut_name == "square-nut":
@@ -149,35 +424,7 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
         nut_pos = self.sim.data.body_xpos[self.obj_body_id[nut_name]]
         return self.on_peg(nut_pos, peg_id)
 
-# class Pre_Novelty_Env1(NutAssembly_D0): 
-#     def _get_initial_placement_bounds(self):
-#         """
-#         Internal function to get bounds for randomization of initial placements of objects (e.g.
-#         what happens when env.reset is called). Should return a dictionary with the following
-#         structure:
-#             object_name
-#                 x: 2-tuple for low and high values for uniform sampling of x-position
-#                 y: 2-tuple for low and high values for uniform sampling of y-position
-#                 z_rot: 2-tuple for low and high values for uniform sampling of z-rotation
-#                 reference: np array of shape (3,) for reference position in world frame (assumed to be static and not change)
-#         """
-#         return dict(
-#             square_nut=dict(
-#                 x=(-0.115, -0.11),
-#                 y=(0.11, 0.225),
-#                 z_rot=(0., 2. * np.pi),
-#                 # NOTE: hardcoded @self.table_offset since this might be called in init function
-#                 reference=np.array((0, 0, 0.82)),
-#             ),
-#             round_nut=dict(
-#                 x=(-0.115, -0.11),
-#                 y=(-0.225, -0.11),
-#                 z_rot=(0., 2. * np.pi),
-#                 # NOTE: hardcoded @self.table_offset since this might be called in init function
-#                 reference=np.array((0, 0, 0.82)),
-#             ),
-#         )
-    
+#region Pre-Novelty Environment    
 class NutAssembly_D0_Pre_Novelty(NutAssembly_D0_RoundPeg_Novelty):
     def _get_initial_placement_bounds(self):
         """
@@ -345,33 +592,33 @@ class NutAssembly_D0_Pre_Novelty(NutAssembly_D0_RoundPeg_Novelty):
                 self.placement_initializer.add_objects(nut)
 
         # get xml element corresponding to both pegs
-        peg1_xml = mujoco_arena.worldbody.find("./body[@name='peg1']")
-        peg2_xml = mujoco_arena.worldbody.find("./body[@name='peg2']")
+        square_peg_xml = mujoco_arena.worldbody.find("./body[@name='peg1']")
+        round_peg_xml = mujoco_arena.worldbody.find("./body[@name='peg2']")
 
         # apply randomization
-        peg1_xml_pos = string_to_array(peg1_xml.get("pos"))
+        square_peg_xml_pos = string_to_array(square_peg_xml.get("pos"))
         peg_bounds = self._get_initial_placement_bounds()["peg"]
 
         sample_x = np.random.uniform(low=peg_bounds["x"][0], high=peg_bounds["x"][1])
         sample_y = np.random.uniform(low=peg_bounds["y"][0], high=peg_bounds["y"][1])
         sample_z_rot = np.random.uniform(low=peg_bounds["z_rot"][0], high=peg_bounds["z_rot"][1])
-        peg1_xml_pos[0] = peg_bounds["reference"][0] + sample_x
-        peg1_xml_pos[1] = peg_bounds["reference"][1] + sample_y
-        peg1_xml_quat = np.array([np.cos(sample_z_rot / 2), 0, 0, np.sin(sample_z_rot / 2)])
+        square_peg_xml_pos[0] = peg_bounds["reference"][0] + sample_x
+        square_peg_xml_pos[1] = peg_bounds["reference"][1] + sample_y
+        square_peg_xml_quat = np.array([np.cos(sample_z_rot / 2), 0, 0, np.sin(sample_z_rot / 2)])
 
         # move peg2 completely out of scene
-        peg2_xml_pos = string_to_array(peg1_xml.get("pos"))
-        peg2_xml_pos[0] = -10.
-        peg2_xml_pos[1] = 0.
+        round_peg_xml_pos = string_to_array(square_peg_xml.get("pos"))
+        round_peg_xml_pos[0] = -10.
+        round_peg_xml_pos[1] = 0.
 
         # set modified entry in xml
-        peg1_xml.set("pos", array_to_string(peg1_xml_pos))
-        peg1_xml.set("quat", array_to_string(peg1_xml_quat))
-        peg2_xml.set("pos", array_to_string(peg2_xml_pos))
+        square_peg_xml.set("pos", array_to_string(square_peg_xml_pos))
+        square_peg_xml.set("quat", array_to_string(square_peg_xml_quat))
+        round_peg_xml.set("pos", array_to_string(round_peg_xml_pos))
 
         # get collision checking entries
-        peg1_size = string_to_array(peg1_xml.find("./geom").get("size"))
-        peg2_size = string_to_array(peg2_xml.find("./geom").get("size"))
+        peg1_size = string_to_array(square_peg_xml.find("./geom").get("size"))
+        peg2_size = string_to_array(round_peg_xml.find("./geom").get("size"))
         self.peg1_horizontal_radius = np.linalg.norm(peg1_size[0:2], 2)
         self.peg2_horizontal_radius = peg2_size[0]
 
@@ -409,7 +656,7 @@ class NutAssembly_D0_Pre_Novelty(NutAssembly_D0_RoundPeg_Novelty):
 
         return observables
 
-
+#region Default Environments
 class Square_D0(NutAssemblySquare, SingleArmEnv_MG):
     """
     Augment robosuite nut assembly square task for mimicgen.
@@ -627,33 +874,20 @@ class Square_D1(Square_D0):
                 self.placement_initializer.add_objects(nut)
 
         # get xml element corresponding to both pegs
-        peg1_xml = mujoco_arena.worldbody.find("./body[@name='peg1']")
-        peg2_xml = mujoco_arena.worldbody.find("./body[@name='peg2']")
+        square_peg_xml = mujoco_arena.worldbody.find("./body[@name='peg1']")
+        round_peg_xml = mujoco_arena.worldbody.find("./body[@name='peg2']")
 
-        # apply randomization
-        peg1_xml_pos = string_to_array(peg1_xml.get("pos"))
-        peg_bounds = self._get_initial_placement_bounds()["peg"]
-
-        sample_x = np.random.uniform(low=peg_bounds["x"][0], high=peg_bounds["x"][1])
-        sample_y = np.random.uniform(low=peg_bounds["y"][0], high=peg_bounds["y"][1])
-        sample_z_rot = np.random.uniform(low=peg_bounds["z_rot"][0], high=peg_bounds["z_rot"][1])
-        peg1_xml_pos[0] = peg_bounds["reference"][0] + sample_x
-        peg1_xml_pos[1] = peg_bounds["reference"][1] + sample_y
-        peg1_xml_quat = np.array([np.cos(sample_z_rot / 2), 0, 0, np.sin(sample_z_rot / 2)])
-
-        # move peg2 completely out of scene
-        peg2_xml_pos = string_to_array(peg1_xml.get("pos"))
-        peg2_xml_pos[0] = -10.
-        peg2_xml_pos[1] = 0.
+        square_peg_xml_pos = string_to_array(square_peg_xml.get("pos"))
+        round_peg_xml_pos = string_to_array(round_peg_xml.get("pos"))
 
         # set modified entry in xml
-        peg1_xml.set("pos", array_to_string(peg1_xml_pos))
-        peg1_xml.set("quat", array_to_string(peg1_xml_quat))
-        peg2_xml.set("pos", array_to_string(peg2_xml_pos))
+        square_peg_xml.set("pos", array_to_string(square_peg_xml_pos))
+        square_peg_xml.set("quat", array_to_string(square_peg_xml_quat))
+        round_peg_xml.set("pos", array_to_string(round_peg_xml_pos))
 
         # get collision checking entries
-        peg1_size = string_to_array(peg1_xml.find("./geom").get("size"))
-        peg2_size = string_to_array(peg2_xml.find("./geom").get("size"))
+        peg1_size = string_to_array(square_peg_xml.find("./geom").get("size"))
+        peg2_size = string_to_array(round_peg_xml.find("./geom").get("size"))
         self.peg1_horizontal_radius = np.linalg.norm(peg1_size[0:2], 2)
         self.peg2_horizontal_radius = peg2_size[0]
 
