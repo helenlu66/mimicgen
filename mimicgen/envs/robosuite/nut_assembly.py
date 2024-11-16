@@ -363,17 +363,17 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             actives += [True]
 
             @sensor(modality=modality)
-            def square_nut_to_square_peg_top_max_lift_height(obs_cache):
+            def square_nut_to_square_peg_top_max_vertical_dist(obs_cache):
                 return self.square_peg_size[2] * 2
-            sensors += [square_nut_to_square_peg_top_max_lift_height]
-            names += ["square-nut1_to_square-peg1_top_max_lift_height"]
+            sensors += [square_nut_to_square_peg_top_max_vertical_dist]
+            names += ["square-nut1_to_square-peg1_top_max_vertical_dist"]
             actives += [True]
 
             @sensor(modality=modality)
-            def square_nut_to_round_peg_top_max_lift_height(obs_cache):
+            def square_nut_to_round_peg_top_max_vertical_dist(obs_cache):
                 return self.round_peg_size[1] * 2
-            sensors += [square_nut_to_round_peg_top_max_lift_height]
-            names += ["square-nut1_to_round-peg1_top_max_lift_height"]
+            sensors += [square_nut_to_round_peg_top_max_vertical_dist]
+            names += ["square-nut1_to_round-peg1_top_max_vertical_dist"]
             actives += [True]
 
             @sensor(modality=modality)
@@ -401,17 +401,17 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             actives += [True]
 
             @sensor(modality=modality)
-            def round_nut_to_round_peg_top_max_lift_height(obs_cache):
+            def round_nut_to_round_peg_top_max_vertical_dist(obs_cache):
                 return self.round_peg_size[1] * 2
-            sensors += [round_nut_to_round_peg_top_max_lift_height]
-            names += ["round-nut1_to_round-peg1_top_max_lift_height"]
+            sensors += [round_nut_to_round_peg_top_max_vertical_dist]
+            names += ["round-nut1_to_round-peg1_top_max_vertical_dist"]
             actives += [True]
 
             @sensor(modality=modality)
-            def round_nut_to_square_peg_top_max_lift_height(obs_cache):
+            def round_nut_to_square_peg_top_max_vertical_dist(obs_cache):
                 return self.square_peg_size[2] * 2
-            sensors += [round_nut_to_square_peg_top_max_lift_height]
-            names += ["round-nut1_to_square-peg1_top_max_lift_height"]
+            sensors += [round_nut_to_square_peg_top_max_vertical_dist]
+            names += ["round-nut1_to_square-peg1_top_max_vertical_dist"]
             actives += [True]
             
             # Create observables
