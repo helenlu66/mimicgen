@@ -8,7 +8,7 @@ Similar to the demo_random_action.py script from robosuite.
 """
 from robosuite.controllers import load_controller_config
 from robosuite.utils.input_utils import *
-from detectors.coffee_detector import Coffee_Detector
+from detection.coffee_detector import Coffee_Detector
 import numpy as np
 
 
