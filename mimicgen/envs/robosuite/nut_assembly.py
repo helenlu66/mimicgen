@@ -91,24 +91,34 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
                 z_rot: 2-tuple for low and high values for uniform sampling of z-rotation
                 reference: np array of shape (3,) for reference position in world frame (assumed to be static and not change)
         """
+        square_peg_x = 0
+        square_peg_y = 0.1
+        round_peg_x = 0
+        round_peg_y = -0.1
         return dict(
             square_nut=dict(
-                x=(0.23, 0.23),
-                y=(-0.1, -0.1),
+                x=(round_peg_x, round_peg_x),
+                y=(round_peg_y, round_peg_y),
                 z_rot=(0., 2. * np.pi),
                 reference=np.array((0, 0, 0.82)),
             ),
             round_nut=dict(
-                x=(0.23, 0.23),
-                y=(-0.1, -0.1),
+                x=(round_peg_x, round_peg_x),
+                y=(round_peg_y, round_peg_y),
                 z_rot=(0., 2. * np.pi),
                 reference=np.array((0, 0, 0.82)),
             ),
             square_peg=dict(
-                x=(0.23, 0.23),
-                y=(-0.1, -0.1),
+                x=(square_peg_x, square_peg_x),
+                y=(square_peg_y, square_peg_y),
                 z_rot=(0., 0.),
-                reference=np.array((0, 0, 0.82)),
+                reference=np.array((square_peg_x, square_peg_y, 0.85)),
+            ),
+            round_peg=dict(
+                x=(round_peg_x, round_peg_x),
+                y=(round_peg_y, round_peg_y),
+                z_rot=(0., 0.),
+                reference=np.array((round_peg_x, round_peg_y, 0.85)),
             ),
         )
 
@@ -170,22 +180,26 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
                 # This is assumed to be a flat sampler, so we just add all nuts to this sampler
                 self.placement_initializer.add_objects(nut)
 
-        # get xml element corresponding to both pegs
-        square_peg_xml = mujoco_arena.worldbody.find("./body[@name='peg1']")
+        # Change the positions of the pegs
+        square_peg_xml = mujoco_arena.worldbody.find("./body[@name='peg1']")  # get xml entry
+        square_peg_bounds = self._get_initial_placement_bounds()["square_peg"]  # get placement bounds
+        square_peg_xml_pos = string_to_array(square_peg_xml.get("pos"))  # get position
+        square_peg_xml_pos[0] = square_peg_bounds["reference"][0]  # update x position
+        square_peg_xml.set("pos", array_to_string(square_peg_xml_pos))  # set new position
+        
         round_peg_xml = mujoco_arena.worldbody.find("./body[@name='peg2']")
+        round_peg_bounds = self._get_initial_placement_bounds()["round_peg"]
+        round_peg_xml_pos = string_to_array(round_peg_xml.get("pos"))
+        round_peg_xml_pos[0] = round_peg_bounds["reference"][0]
+        round_peg_xml.set("pos", array_to_string(round_peg_xml_pos))        
 
-        # apply randomization
-        # square_peg_xml_pos = string_to_array(square_peg_xml.get("pos"))
-        # peg_bounds = self._get_initial_placement_bounds()["peg"]
-
+        # additional code for applying randomization - do before setting the new position
         # sample_x = np.random.uniform(low=peg_bounds["x"][0], high=peg_bounds["x"][1])
         # sample_y = np.random.uniform(low=peg_bounds["y"][0], high=peg_bounds["y"][1])
         # sample_z_rot = np.random.uniform(low=peg_bounds["z_rot"][0], high=peg_bounds["z_rot"][1])
         # square_peg_xml_pos[0] = peg_bounds["reference"][0] + sample_x
         # square_peg_xml_pos[1] = peg_bounds["reference"][1] + sample_y
         # square_peg_xml_quat = np.array([np.cos(sample_z_rot / 2), 0, 0, np.sin(sample_z_rot / 2)])
-
-        # round_peg_xml_pos = string_to_array(round_peg_xml.get("pos"))
 
         # # set modified entry in xml
         # square_peg_xml.set("pos", array_to_string(square_peg_xml_pos))
