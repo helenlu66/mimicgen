@@ -310,7 +310,7 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             def gripper1_to_square_peg1_dist(obs_cache):
                 gripper_pos = self.sim.data.body_xpos[gripper_id]
                 peg_pos = self.sim.data.body_xpos[square_peg_id]
-                return np.linalg.norm(gripper_pos - peg_pos)
+                return gripper_pos - peg_pos
             sensors += [gripper1_to_square_peg1_dist]
             names += ["gripper1_to_square-peg1_dist"]
             actives += [True]
@@ -328,7 +328,7 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             def gripper1_to_round_peg1_dist(obs_cache):
                 gripper_pos = self.sim.data.body_xpos[gripper_id]
                 peg_pos = self.sim.data.body_xpos[round_peg_id]
-                return np.linalg.norm(gripper_pos - peg_pos)
+                return gripper_pos - peg_pos
             sensors += [gripper1_to_round_peg1_dist]
             names += ["gripper1_to_round-peg1_dist"]
             actives += [True]
@@ -343,32 +343,78 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             actives += [True]
 
             @sensor(modality=modality)
-            def top_of_square_peg1(obs_cache):
-                return top_of_square_peg
-            sensors += [top_of_square_peg1]
-            names += ["top_of_square-peg1"]
-            actives += [True]
+            def square_peg1_height(obs_cache):
+                return top_of_square_peg[2] - 0.82
+            sensors += [square_peg1_height]
+            names += ["square-peg1_height"]
 
             @sensor(modality=modality)
-            def top_of_round_peg1(obs_cache):
-                return top_of_round_peg
-            sensors += [top_of_round_peg1]
-            names += ["top_of_round-peg1"]
-            actives += [True]
+            def round_peg1_height(obs_cache):
+                return top_of_round_peg[2] - 0.82
+            sensors += [round_peg1_height]
+            names += ["round-peg1_height"]
 
             @sensor(modality=modality)
-            def bottom_of_square_peg1(obs_cache):
-                return 0.82
-            sensors += [bottom_of_square_peg1]
-            names += ["bottom_of_square-peg1"]
-            actives += [True]
+            def square_nut1_bottom_height_above_square_peg1_base(obs_cache):
+                bottom_of_square_nut = np.copy(self.sim.data.body_xpos[square_nut_id]) - [0, 0, 0.01]
+                bottom_of_square_peg1 = 0.82
+                return bottom_of_square_nut[2] - bottom_of_square_peg1
+            sensors += [square_nut1_bottom_height_above_square_peg1_base]
+            names += ["square-nut1_bottom_height_above_square-peg1_base"]
 
             @sensor(modality=modality)
-            def bottom_of_round_peg1(obs_cache):
-                return 0.82
-            sensors += [bottom_of_round_peg1]
-            names += ["bottom_of_round-peg1"]
-            actives += [True]
+            def square_nut1_bottom_height_above_round_peg1_base(obs_cache):
+                bottom_of_square_nut = np.copy(self.sim.data.body_xpos[square_nut_id]) - [0, 0, 0.01]
+                bottom_of_round_peg1 = 0.82
+                return bottom_of_square_nut[2] - bottom_of_round_peg1
+            sensors += [square_nut1_bottom_height_above_round_peg1_base]
+            names += ["square-nut1_bottom_height_above_round-peg1_base"]
+
+            @sensor(modality=modality)
+            def round_nut1_bottom_height_above_square_peg1_base(obs_cache):
+                bottom_of_round_nut = np.copy(self.sim.data.body_xpos[round_nut_id]) - [0, 0, 0.01]
+                bottom_of_square_peg1 = 0.82
+                return bottom_of_round_nut[2] - bottom_of_square_peg1
+            sensors += [round_nut1_bottom_height_above_square_peg1_base]
+            names += ["round-nut1_bottom_height_above_square-peg1_base"]
+
+            @sensor(modality=modality)
+            def round_nut1_bottom_height_above_round_peg1_base(obs_cache):
+                bottom_of_round_nut = np.copy(self.sim.data.body_xpos[round_nut_id]) - [0, 0, 0.01]
+                bottom_of_round_peg1 = 0.82
+                return bottom_of_round_nut[2] - bottom_of_round_peg1
+            sensors += [round_nut1_bottom_height_above_round_peg1_base]
+            names += ["round-nut1_bottom_height_above_round-peg1_base"]
+
+    
+
+            # @sensor(modality=modality)
+            # def top_of_square_peg1(obs_cache):
+            #     return top_of_square_peg
+            # sensors += [top_of_square_peg1]
+            # names += ["top_of_square-peg1"]
+            # actives += [True]
+
+            # @sensor(modality=modality)
+            # def top_of_round_peg1(obs_cache):
+            #     return top_of_round_peg
+            # sensors += [top_of_round_peg1]
+            # names += ["top_of_round-peg1"]
+            # actives += [True]
+
+            # @sensor(modality=modality)
+            # def bottom_of_square_peg1(obs_cache):
+            #     return 0.82
+            # sensors += [bottom_of_square_peg1]
+            # names += ["bottom_of_square-peg1"]
+            # actives += [True]
+
+            # @sensor(modality=modality)
+            # def bottom_of_round_peg1(obs_cache):
+            #     return 0.82
+            # sensors += [bottom_of_round_peg1]
+            # names += ["bottom_of_round-peg1"]
+            # actives += [True]
 
             # @sensor(modality=modality)
             # def bottom_of_square_nut1(obs_cache):
@@ -386,13 +432,13 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             # names += ["bottom_of_round-nut1"]
             # actives += [True]
 
-            @sensor(modality=modality)
-            def square_nut_bottom_to_square_peg_top(obs_cache):
-                bottom_of_square_nut = np.copy(self.sim.data.body_xpos[square_nut_id]) - [0, 0, 0.01]
-                return bottom_of_square_nut - top_of_square_peg
-            sensors += [square_nut_bottom_to_square_peg_top]
-            names += ["square-nut1_bottom_to_square-peg1_top"]
-            actives += [True]
+            # @sensor(modality=modality)
+            # def square_nut_bottom_to_square_peg_top(obs_cache):
+            #     bottom_of_square_nut = np.copy(self.sim.data.body_xpos[square_nut_id]) - [0, 0, 0.01]
+            #     return bottom_of_square_nut - top_of_square_peg
+            # sensors += [square_nut_bottom_to_square_peg_top]
+            # names += ["square-nut1_bottom_to_square-peg1_top"]
+            # actives += [True]
 
             # @sensor(modality=modality)
             # def square_nut_to_square_peg_top_max_vertical_dist(obs_cache):
@@ -408,43 +454,31 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             # names += ["square-nut1_to_round-peg1_top_max_vertical_dist"]
             # actives += [True]
 
-            @sensor(modality=modality)
-            def square_nut_bottom_to_round_peg_top(obs_cache):
-                bottom_of_square_nut = np.copy(self.sim.data.body_xpos[square_nut_id]) - [0, 0, 0.01]
-                return bottom_of_square_nut - top_of_round_peg
-            sensors += [square_nut_bottom_to_round_peg_top]
-            names += ["square-nut1_bottom_to_round-peg1_top"]
-            actives += [True]
+            # @sensor(modality=modality)
+            # def square_nut_bottom_to_round_peg_top(obs_cache):
+            #     bottom_of_square_nut = np.copy(self.sim.data.body_xpos[square_nut_id]) - [0, 0, 0.01]
+            #     return bottom_of_square_nut - top_of_round_peg
+            # sensors += [square_nut_bottom_to_round_peg_top]
+            # names += ["square-nut1_bottom_to_round-peg1_top"]
+            # actives += [True]
 
-            @sensor(modality=modality)
-            def round_nut_bottom_to_square_peg_top(obs_cache):
-                bottom_of_round_nut = np.copy(self.sim.data.body_xpos[round_nut_id]) - [0, 0, 0.01]
-                return bottom_of_round_nut - top_of_square_peg
-            sensors += [round_nut_bottom_to_square_peg_top]
-            names += ["round-nut1_bottom_to_square-peg1_top"]
-            actives += [True]
+            # @sensor(modality=modality)
+            # def round_nut_bottom_to_square_peg_top(obs_cache):
+            #     bottom_of_round_nut = np.copy(self.sim.data.body_xpos[round_nut_id]) - [0, 0, 0.01]
+            #     return bottom_of_round_nut - top_of_square_peg
+            # sensors += [round_nut_bottom_to_square_peg_top]
+            # names += ["round-nut1_bottom_to_square-peg1_top"]
+            # actives += [True]
 
-            @sensor(modality=modality)
-            def round_nut_bottom_to_round_peg_top(obs_cache):
-                bottom_of_round_nut = np.copy(self.sim.data.body_xpos[round_nut_id]) - [0, 0, 0.01]
-                return bottom_of_round_nut - top_of_round_peg
-            sensors += [round_nut_bottom_to_round_peg_top]
-            names += ["round-nut1_bottom_to_round-peg1_top"]
-            actives += [True]
+            # @sensor(modality=modality)
+            # def round_nut_bottom_to_round_peg_top(obs_cache):
+            #     bottom_of_round_nut = np.copy(self.sim.data.body_xpos[round_nut_id]) - [0, 0, 0.01]
+            #     return bottom_of_round_nut - top_of_round_peg
+            # sensors += [round_nut_bottom_to_round_peg_top]
+            # names += ["round-nut1_bottom_to_round-peg1_top"]
+            # actives += [True]
 
-            @sensor(modality=modality)
-            def round_nut_to_round_peg_top_max_vertical_dist(obs_cache):
-                return self.round_peg_size[1] * 2
-            sensors += [round_nut_to_round_peg_top_max_vertical_dist]
-            names += ["round-nut1_to_round-peg1_top_max_vertical_dist"]
-            actives += [True]
 
-            @sensor(modality=modality)
-            def round_nut_to_square_peg_top_max_vertical_dist(obs_cache):
-                return self.square_peg_size[2] * 2
-            sensors += [round_nut_to_square_peg_top_max_vertical_dist]
-            names += ["round-nut1_to_square-peg1_top_max_vertical_dist"]
-            actives += [True]
             
             # Create observables
             for name, s, active in zip(names, sensors, actives):
