@@ -52,7 +52,7 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
         nut_y_ranges = (bounds["square_nut"]["y"], bounds["round_nut"]["y"])
         nut_z_ranges = (bounds["square_nut"]["z_rot"], bounds["round_nut"]["z_rot"])
         nut_references = (bounds["square_nut"]["reference"], bounds["round_nut"]["reference"])
-        z_offsets = (0.1, 0.02)
+        z_offsets = (-0.02, -0.04)
 
         placement_initializer = SequentialCompositeSampler(name="ObjectSampler")
         for nut_name, x_range, y_range, z_range, z_offset, ref in zip(nut_names, nut_x_ranges, nut_y_ranges, nut_z_ranges, z_offsets, nut_references):
@@ -112,7 +112,7 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
                 x=(square_peg_x, square_peg_x),
                 y=(square_peg_y, square_peg_y),
                 z_rot=(0., 0.),
-                reference=np.array((square_peg_x, square_peg_y, 0.85)),
+                reference=np.array((square_peg_x, square_peg_y, 0.83)),
             ),
             round_peg=dict(
                 x=(round_peg_x, round_peg_x),
