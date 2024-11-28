@@ -347,12 +347,14 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
                 return top_of_square_peg[2] - 0.82
             sensors += [square_peg1_height]
             names += ["square-peg1_height"]
+            actives += [True]
 
             @sensor(modality=modality)
             def round_peg1_height(obs_cache):
                 return top_of_round_peg[2] - 0.82
             sensors += [round_peg1_height]
             names += ["round-peg1_height"]
+            actives += [True]
 
             @sensor(modality=modality)
             def square_nut1_bottom_height_above_square_peg1_base(obs_cache):
@@ -361,6 +363,7 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
                 return bottom_of_square_nut[2] - bottom_of_square_peg1
             sensors += [square_nut1_bottom_height_above_square_peg1_base]
             names += ["square-nut1_bottom_height_above_square-peg1_base"]
+            actives += [True]
 
             @sensor(modality=modality)
             def square_nut1_bottom_height_above_round_peg1_base(obs_cache):
@@ -369,6 +372,7 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
                 return bottom_of_square_nut[2] - bottom_of_round_peg1
             sensors += [square_nut1_bottom_height_above_round_peg1_base]
             names += ["square-nut1_bottom_height_above_round-peg1_base"]
+            actives += [True]
 
             @sensor(modality=modality)
             def round_nut1_bottom_height_above_square_peg1_base(obs_cache):
@@ -377,6 +381,7 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
                 return bottom_of_round_nut[2] - bottom_of_square_peg1
             sensors += [round_nut1_bottom_height_above_square_peg1_base]
             names += ["round-nut1_bottom_height_above_square-peg1_base"]
+            actives += [True]
 
             @sensor(modality=modality)
             def round_nut1_bottom_height_above_round_peg1_base(obs_cache):
@@ -385,6 +390,7 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
                 return bottom_of_round_nut[2] - bottom_of_round_peg1
             sensors += [round_nut1_bottom_height_above_round_peg1_base]
             names += ["round-nut1_bottom_height_above_round-peg1_base"]
+            actives += [True]
 
     
 
