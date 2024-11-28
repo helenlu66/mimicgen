@@ -310,7 +310,7 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             def gripper1_to_square_peg1_dist(obs_cache):
                 gripper_pos = self.sim.data.body_xpos[gripper_id]
                 peg_pos = self.sim.data.body_xpos[square_peg_id]
-                return np.linalg.norm(gripper_pos - peg_pos)
+                return gripper_pos - peg_pos
             sensors += [gripper1_to_square_peg1_dist]
             names += ["gripper1_to_square-peg1_dist"]
             actives += [True]
@@ -328,7 +328,7 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             def gripper1_to_round_peg1_dist(obs_cache):
                 gripper_pos = self.sim.data.body_xpos[gripper_id]
                 peg_pos = self.sim.data.body_xpos[round_peg_id]
-                return np.linalg.norm(gripper_pos - peg_pos)
+                return gripper_pos - peg_pos
             sensors += [gripper1_to_round_peg1_dist]
             names += ["gripper1_to_round-peg1_dist"]
             actives += [True]
