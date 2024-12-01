@@ -789,20 +789,204 @@ class CubeCleanup_Mug_Novelty(MugCleanup):
             self.cube.joints[0], np.concatenate([cube_pos, cube_quat])
         )
         self.sim.forward()
+    
+    def rename_observables(self, observables):
+        """
+        Make copies of the observables with names that match the planning domain.
+        """
+        # Positions and orientations of objects
+        observables['gripper1_pos'] = observables.pop('robot0_eef_pos')
+        observables['gripper1_quat'] = observables.pop('robot0_eef_quat')
+        observables['mug1_pos'] = observables.pop('mug_pos')
+        observables['mug1_quat'] = observables.pop('mug_quat')
+        observables['drawer1_pos'] = observables.pop('drawer_pos')
+        observables['drawer1_quat'] = observables.pop('drawer_quat')
+        observables['block1_pos'] = observables.pop('cube_pos')
+        observables['block1_quat'] = observables.pop('cube_quat')
+        
+        # Distances between gripper and objects
+        observables['gripper1_to_mug1_dist'] = observables.pop('mug_to_robot0_eef_pos')
+        observables['gripper1_to_mug1_quat'] = observables.pop('mug_to_robot0_eef_quat')
+        observables['gripper1_to_block1_dist'] = observables.pop('cube_to_robot0_eef_pos')
+        observables['gripper1_to_block1_quat'] = observables.pop('cube_to_robot0_eef_quat')
+        observables['gripper1_to_drawer1_dist'] = observables.pop('drawer_to_robot0_eef_pos')
+        observables['gripper1_to_drawer1_quat'] = observables.pop('drawer_to_robot0_eef_quat')
+
+        observables['drawer1_joint_pos'] = observables.pop('drawer_joint_pos')
+
+        return observables
+    
+    def _calculate_boxes_overlap_percentage(self, obj1_pos, obj1_half_bounding_box, obj2_pos, obj2_half_bounding_box):
+        """calculate the percentage of obj1's bounding box that overlaps with obj2's bounding box
+
+        Args:
+            obj1_pos (np.array): position of obj1
+            obj1_half_bounding_box (np.array): half bounding box size of obj1
+            obj2_pos (np.array): position of obj2
+            obj2_half_bounding_box (np.array): half bounding box size of obj2
+        """
+        x1, y1, z1 = obj1_pos
+        hx1, hy1, hz1 = obj1_half_bounding_box
+        x2, y2, z2 = obj2_pos
+        hx2, hy2, hz2 = obj2_half_bounding_box
+
+        # calculate the min and max coordinates of the bounding boxes
+        min1 = [x1 - hx1, y1 - hy1, z1 - hz1]
+        max1 = [x1 + hx1, y1 + hy1, z1 + hz1]
+        min2 = [x2 - hx2, y2 - hy2, z2 - hz2]
+        max2 = [x2 + hx2, y2 + hy2, z2 + hz2]
+
+        # calculate the overlap along each axis
+        overlap = [max(0, min1[i] - max2[i], max1[i] - min2[i]) for i in range(3)]
+        # calculate the volume of the overlap
+        overlap_volume = overlap[0] * overlap[1] * overlap[2]
+        # calculate the volume of obj1
+        obj1_volume = (2 * hx1) * (2 * hy1) * (2 * hz1)
+        # calculate the percentage of obj1's volume that overlaps with obj2
+        overlap_percentage = overlap_volume / obj1_volume
+        return overlap_percentage
+    
+    def _create_overlap_sensors(self):
+        """
+        Create sensors for the overlap between objects.
+        """
+        sensors = []
+        names = []
+
+        # Get robot prefix and define observables modality
+        pf = self.robots[0].robot_model.naming_prefix
+        modality = "object"
+        block1_id = self.sim.model.body_name2id(self.cube.root_body)
+        drawer1_id = self.sim.model.body_name2id(self.drawer.root_body)
+        mug1_id = self.sim.model.body_name2id(self.mug.root_body)
+        block1_pos = self.sim.data.body_xpos[block1_id]
+        block1_half_bounding_box = self.cube.get_bounding_box_half_size()
+        mug1_pos = self.sim.data.body_xpos[mug1_id]
+        mug1_half_bounding_box = self.mug.get_bounding_box_half_size()
+        drawer1_pos = self.sim.data.body_xpos[drawer1_id]
+        drawer1_half_bounding_box = self.drawer.get_bounding_box_half_size()
+        drawer1_half_bounding_box[1] = self.drawer.horizontal_radius # use the horizontal radius for the y-axis since for some reason the half bounding box's y is 0
+
+        block1_mug1_overlap = self._calculate_boxes_overlap_percentage(block1_pos, block1_half_bounding_box, mug1_pos, mug1_half_bounding_box)
+        block1_drawer1_overlap = self._calculate_boxes_overlap_percentage(block1_pos, block1_half_bounding_box, drawer1_pos, drawer1_half_bounding_box)
+        mug1_drawer1_overlap = self._calculate_boxes_overlap_percentage(mug1_pos, mug1_half_bounding_box, drawer1_pos, drawer1_half_bounding_box)
+        mug1_block1_overlap = self._calculate_boxes_overlap_percentage(mug1_pos, mug1_half_bounding_box, block1_pos, block1_half_bounding_box)
+        drawer1_block1_overlap = self._calculate_boxes_overlap_percentage(drawer1_pos, drawer1_half_bounding_box, block1_pos, block1_half_bounding_box)
+        drawer1_mug1_overlap = self._calculate_boxes_overlap_percentage(drawer1_pos, drawer1_half_bounding_box, mug1_pos, mug1_half_bounding_box)
+
+        @sensor(modality=modality)
+        def percent_overlap_of_block1_bounding_box_with_mug1_bounding_box(obs_cache):
+            return block1_mug1_overlap
+        sensors += [percent_overlap_of_block1_bounding_box_with_mug1_bounding_box]
+        names += ["percent_overlap_of_block1_bounding_box_with_mug1_bounding_box"]
+
+        @sensor(modality=modality)
+        def percent_overlap_of_block1_bounding_box_with_drawer1_bounding_box(obs_cache):
+            return block1_drawer1_overlap
+        sensors += [percent_overlap_of_block1_bounding_box_with_drawer1_bounding_box]
+        names += ["percent_overlap_of_block1_bounding_box_with_drawer1_bounding_box"]
+
+        @sensor(modality=modality)
+        def percent_overlap_of_mug1_bounding_box_with_drawer1_bounding_box(obs_cache):
+            return mug1_drawer1_overlap
+        sensors += [percent_overlap_of_mug1_bounding_box_with_drawer1_bounding_box]
+        names += ["percent_overlap_of_mug1_bounding_box_with_drawer1_bounding_box"]
+
+        @sensor(modality=modality)
+        def percent_overlap_of_mug1_bounding_box_with_block1_bounding_box(obs_cache):
+            return mug1_block1_overlap
+        sensors += [percent_overlap_of_mug1_bounding_box_with_block1_bounding_box]
+        names += ["percent_overlap_of_mug1_bounding_box_with_block1_bounding_box"]
+
+        @sensor(modality=modality)
+        def percent_overlap_of_drawer1_bounding_box_with_block1_bounding_box(obs_cache):
+            return drawer1_block1_overlap
+        sensors += [percent_overlap_of_drawer1_bounding_box_with_block1_bounding_box]
+        names += ["percent_overlap_of_drawer1_bounding_box_with_block1_bounding_box"]
+
+        @sensor(modality=modality)
+        def percent_overlap_of_drawer1_bounding_box_with_mug1_bounding_box(obs_cache):
+            return drawer1_mug1_overlap
+        sensors += [percent_overlap_of_drawer1_bounding_box_with_mug1_bounding_box]
+        names += ["percent_overlap_of_drawer1_bounding_box_with_mug1_bounding_box"]
+
+        return sensors, names
 
     def _setup_observables(self):
         observables = super()._setup_observables()
+
+        observables = self.rename_observables(observables)
 
         if self.use_object_obs:
             # Get robot prefix and define observables modality
             pf = self.robots[0].robot_model.naming_prefix
             modality = "object"
+            block1_id = self.sim.model.body_name2id(self.cube.root_body)
+            drawer1_id = self.sim.model.body_name2id(self.drawer.root_body)
+            mug1_id = self.sim.model.body_name2id(self.mug.root_body)
 
             # Add cube sensors
-            cube_sensors, cube_sensor_names = self._create_obj_sensors(
+            block_sensors, block_sensor_names = self._create_obj_sensors(
                 obj_name="cube", modality=modality
             )
-            for name, s in zip(cube_sensor_names, cube_sensors):
+
+            # Add overlap sensors
+            sensors, names = self._create_overlap_sensors()
+
+            sensors += block_sensors
+            names += block_sensor_names
+
+            @sensor(modality=modality)
+            def gripper1_to_obj_max_absolute_dist(obs_cache):
+                table_size = self.model.mujoco_arena.table_full_size
+                # assume the highest the robot can reach is 1.0m above the table
+                max_dist = [dist for dist in table_size]  # copy the table size
+                max_dist[2] += 1.0
+                return max_dist
+            sensors += [gripper1_to_obj_max_absolute_dist]
+            names += ["gripper1_to_obj_max_absolute_dist"]
+
+            @sensor(modality=modality)
+            def max_height_above_table1(obs_cache):
+                return 1.0 # assume the highest an object can be is 1.0m above the table
+            sensors += [max_height_above_table1]
+            names += ["max_height_above_table1"]
+
+            @sensor(modality=modality)
+            def height_of_block1_lowest_point_above_table1_surface(obs_cache):
+                table1_height = self.table_offset[2]
+                block1_pos = self.sim.data.body_xpos[block1_id]
+                # estimate the lowest point to be half bounding box below the center
+                block1_half_bounding_box = self.cube.get_bounding_box_half_size()
+                lowest_block1_point = block1_pos[2] - block1_half_bounding_box[2]
+                return max(0, lowest_block1_point - table1_height) # make sure it's non-negative
+            sensors += [height_of_block1_lowest_point_above_table1_surface]
+            names += ["height_of_block1_lowest_point_above_table1_surface"]
+
+            @sensor(modality=modality)
+            def height_of_mug1_lowest_point_above_table1_surface(obs_cache):
+                table1_height = self.table_offset[2]
+                mug1_pos = self.sim.data.body_xpos[mug1_id]
+                # estimate the lowest point to be half bounding box below the center
+                mug1_half_bounding_box = self.mug.get_bounding_box_half_size()
+                lowest_mug1_point = mug1_pos[2] - mug1_half_bounding_box[2]
+                return max(0, lowest_mug1_point - table1_height) # make sure it's non-negative
+            sensors += [height_of_mug1_lowest_point_above_table1_surface]
+            names += ["height_of_mug1_lowest_point_above_table1_surface"]
+
+            @sensor(modality=modality)
+            def height_of_drawer1_lowest_point_above_table1_surface(obs_cache):
+                table1_height = self.table_offset[2]
+                drawer1_pos = self.sim.data.body_xpos[drawer1_id]
+                # estimate the lowest to be half bounding box below the center
+                drawer1_half_bounding_box = self.drawer.get_bounding_box_half_size()
+                lowest_drawer1_point = drawer1_pos[2] - drawer1_half_bounding_box[2]
+                return max(0, lowest_drawer1_point - table1_height) # make sure it's non-negative
+            sensors += [height_of_drawer1_lowest_point_above_table1_surface]
+            names += ["height_of_drawer1_lowest_point_above_table1_surface"]
+
+
+            for name, s in zip(names, sensors):
                 observables[name] = Observable(
                     name=name,
                     sensor=s,
