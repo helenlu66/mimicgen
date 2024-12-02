@@ -211,6 +211,14 @@ class LongDrawerObject(MujocoXMLObject):
         super().__init__(path_to_cabinet_xml,
                          name=name, joints=None, obj_type="all", duplicate_collision_geoms=True)
 
+    @property
+    def max_drawer_travel_distance(self):
+        return 0.12 # the y of the `drawer_bottom` geom size
+    
+    @property
+    def drawer_side_wall_size(self):
+        return np.array([0.008, 0.1435, 0.064])
+    
     # NOTE: had to manually set these to get placement sampler working okay
     @property
     def bottom_offset(self):

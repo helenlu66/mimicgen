@@ -1201,6 +1201,50 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
 
             self.sim.data.set_joint_qpos(pod_obj.joints[0], np.concatenate([np.array(pod_pos), np.array(pod_quat)]))
 
+    def rename_observables(self, observables):
+        """
+        Make copies of the observables with names that match the planning domain.
+        """
+        # Positions and orientations of objects
+        observables['gripper1_pos'] = observables.pop('robot0_eef_pos')
+        observables['gripper1_quat'] = observables.pop('robot0_eef_quat')
+        observables['mug1_pos'] = observables.pop('mug_pos')
+        observables['mug1_quat'] = observables.pop('mug_quat')
+        observables['drawer1_pos'] = observables.pop('drawer_pos')
+        observables['drawer1_quat'] = observables.pop('drawer_quat')
+        observables['coffee-pod1_pos'] = observables.pop('coffee_pod_pos')
+        observables['coffee-pod1_quat'] = observables.pop('coffee_pod_quat')
+        observables['coffee-pod-holder1_pos'] = observables.pop('coffee_pod_holder_pos')
+        observables['coffee-pod-holder1_quat'] = observables.pop('coffee_pod_holder_quat')
+        observables['coffee-machine1_pos'] = observables.pop('coffee_machine_pos')
+        observables['coffee-machine1_quat'] = observables.pop('coffee_machine_quat')
+        observables['lid1_pos'] = observables.pop('coffee_machine_lid_pos')
+        observables['lid1_quat'] = observables.pop('coffee_machine_lid_quat')
+
+        # Distances between pod and pod holder
+        observables['coffee-pod1_pos_rel_coffee-pod-holder1'] = observables.pop('pod_pos_rel_pod_holder')
+        observables['coffee-pod1_quat_rel_coffee-pod-holder1'] = observables.pop('pod_quat_rel_pod_holder')
+        
+        # Distances between gripper and objects
+        observables['gripper1_to_mug1_dist'] = observables.pop('mug_to_robot0_eef_pos')
+        observables['gripper1_to_mug1_quat'] = observables.pop('mug_to_robot0_eef_quat')
+        observables['gripper1_to_coffee-pod1-dist'] = observables.pop('coffee_pod_to_robot0_eef_pos')
+        observables['gripper1_to_coffee-pod1-quat'] = observables.pop('coffee_pod_to_robot0_eef_quat')
+        observables['gripper1_to_coffee-machine1-dist'] = observables.pop('coffee_machine_to_robot0_eef_pos')
+        observables['gripper1_to_coffee-machine1-quat'] = observables.pop('coffee_machine_to_robot0_eef_quat')
+        observables['gripper1_to_lid1_dist'] = observables.pop('coffee_machine_lid_to_robot0_eef_pos')
+        observables['gripper1_to_lid1_quat'] = observables.pop('coffee_machine_lid_to_robot0_eef_quat')
+        observables['gripper1_to_drawer1_dist'] = observables.pop('drawer_to_robot0_eef_pos')
+        observables['gripper1_to_drawer1_quat'] = observables.pop('drawer_to_robot0_eef_quat')
+
+        # Avoid using drawer joint position as it should not be observable to the robot as a novel object
+        # observables.pop('drawer_joint_pos')
+        
+        # object joint angles
+        observables['lid1_hinge_angle'] = observables.pop('hinge_angle')
+
+        return observables
+    
     def _setup_observables(self):
         """
         Sets up observables to be used for this environment. Creates object-based observables if enabled
@@ -1212,27 +1256,196 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         # super class will populate observables for "mug" and "drawer" poses in addition to coffee machine and coffee pod
         observables = super()._setup_observables()
 
+        drawer_opening_percentage = self.check_drawer_open_percentage()
+
         if self.use_object_obs:
             modality = "object"
 
             # add drawer joint angle observable
+            # @sensor(modality=modality)
+            # def drawer_joint_angle(obs_cache):
+            #     return np.array([self.sim.data.qpos[self.cabinet_qpos_addr]])
+            # sensors = [drawer_joint_angle]
+            # names = ["drawer_joint_angle"]
+            # actives = [True]
+
+            # add overlap sensors
+            sensors, names = self._create_overlap_sensors()
+
             @sensor(modality=modality)
-            def drawer_joint_angle(obs_cache):
-                return np.array([self.sim.data.qpos[self.cabinet_qpos_addr]])
-            sensors = [drawer_joint_angle]
-            names = ["drawer_joint_angle"]
-            actives = [True]
+            def gripper1_to_any_obj_max_absolute_dist(obs_cache):
+                table_size = self.model.mujoco_arena.table_full_size
+                # assume the highest the robot can reach is 1.0m above the table
+                max_dist = [dist for dist in table_size]  # copy the table size
+                max_dist[2] += 1.0
+                return max_dist
+            sensors += [gripper1_to_any_obj_max_absolute_dist]
+            names += ["gripper1_to_any_obj_max_absolute_dist"]
+
+            # add drawer's max travel distance observable
+            @sensor(modality=modality)
+            def drawer1_cabinet_side_length(obs_cache):
+                return self.cabinet_object.drawer_side_wall_size[1]
+            sensors += [drawer1_cabinet_side_length]
+            names += ["drawer1_cabinet_side_length"]
+    
+
+            @sensor(modality=modality)
+            def drawer1_travel_distance(obs_cache):
+                return drawer_opening_percentage * self.cabinet_object.max_drawer_travel_distance
+            sensors += [drawer1_travel_distance]
+            names += ["drawer1_travel_distance"]
+
+
 
             # Create observables
-            for name, s, active in zip(names, sensors, actives):
+            for name, s in zip(names, sensors):
                 observables[name] = Observable(
                     name=name,
                     sensor=s,
                     sampling_rate=self.control_freq,
-                    active=active,
+                    active=True,
                 )
+        
+        observables = self.rename_observables(observables)
 
         return observables
+    
+    def _calculate_boxes_overlap_percentage(self, obj1_pos, obj1_half_bounding_box, obj2_pos, obj2_half_bounding_box):
+        """calculate the percentage of obj1's bounding box that overlaps with obj2's bounding box
+
+        Args:
+            obj1_pos (np.array): position of obj1
+            obj1_half_bounding_box (np.array): half bounding box size of obj1
+            obj2_pos (np.array): position of obj2
+            obj2_half_bounding_box (np.array): half bounding box size of obj2
+        """
+        x1, y1, z1 = obj1_pos
+        hx1, hy1, hz1 = obj1_half_bounding_box
+        x2, y2, z2 = obj2_pos
+        hx2, hy2, hz2 = obj2_half_bounding_box
+
+        # calculate the min and max coordinates of the bounding boxes
+        min1 = [x1 - hx1, y1 - hy1, z1 - hz1]
+        max1 = [x1 + hx1, y1 + hy1, z1 + hz1]
+        min2 = [x2 - hx2, y2 - hy2, z2 - hz2]
+        max2 = [x2 + hx2, y2 + hy2, z2 + hz2]
+
+        # calculate the overlap along each axis
+        overlap = [max(0, min1[i] - max2[i], max1[i] - min2[i]) for i in range(3)]
+        # calculate the volume of the overlap
+        overlap_volume = overlap[0] * overlap[1] * overlap[2]
+        # calculate the volume of obj1
+        obj1_volume = (2 * hx1) * (2 * hy1) * (2 * hz1)
+        # calculate the percentage of obj1's volume that overlaps with obj2
+        overlap_percentage = overlap_volume / obj1_volume
+        return overlap_percentage
+    
+    def _create_overlap_sensors(self):
+        """
+        Create sensors for the overlap between objects.
+        """
+        sensors = []
+        names = []
+
+        modality = "object"
+        drawer1_id = self.sim.model.body_name2id(self.cabinet_object.root_body)
+        drawer1_pos = self.sim.data.body_xpos[drawer1_id]
+        drawer1_half_bounding_box = self.cabinet_object.get_bounding_box_half_size()
+        drawer1_half_bounding_box[1] = self.cabinet_object.horizontal_radius # use the horizontal radius for the y-axis since for some reason the half bounding box's y is 0
+        mug1_id = self.sim.model.body_name2id(self.mug.root_body)
+        mug1_pos = self.sim.data.body_xpos[mug1_id]
+        mug1_half_bounding_box = self.mug.get_bounding_box_half_size()
+        coffee_pod_id = self.sim.model.body_name2id(self.coffee_pod.root_body)
+        coffee_pod_pos = self.sim.data.body_xpos[coffee_pod_id]
+        coffee_pod_half_bounding_box = self.coffee_pod.get_bounding_box_half_size()
+        coffe_machine_lid_id = self.sim.model.body_name2id(self.coffee_machine.name + '_' + self.coffee_machine.lid.root_body)
+        coffee_machine_lid_pos = self.sim.data.body_xpos[coffe_machine_lid_id]
+        coffee_machine_lid_half_bounding_box = self.coffee_machine.lid.get_bounding_box_half_size()
+        coffee_pod_holder_id = self.sim.model.body_name2id(self.coffee_machine.name + '_' + self.coffee_machine.pod_holder.root_body)
+        coffee_pod_holder_pos = self.sim.data.body_xpos[coffee_pod_holder_id]
+        coffee_pod_holder_half_bounding_box = self.coffee_machine.pod_holder.get_bounding_box_half_size()
+
+        # mug1 overlaps
+        mug1_drawer1_overlap = self._calculate_boxes_overlap_percentage(mug1_pos, mug1_half_bounding_box, drawer1_pos, drawer1_half_bounding_box)
+        mug1_coffee_pod_holder1_overlap = self._calculate_boxes_overlap_percentage(mug1_pos, mug1_half_bounding_box, coffee_pod_holder_pos, coffee_pod_holder_half_bounding_box)
+
+        # coffee pod overlaps
+        coffee_pod1_drawer1_overlap = self._calculate_boxes_overlap_percentage(coffee_pod_pos, coffee_pod_half_bounding_box, drawer1_pos, drawer1_half_bounding_box)
+        coffee_pod1_mug1_overlap = self._calculate_boxes_overlap_percentage(coffee_pod_pos, coffee_pod_half_bounding_box, mug1_pos, mug1_half_bounding_box)
+        coffee_pod1_coffee_pod_holder1_overlap = self._calculate_boxes_overlap_percentage(coffee_pod_pos, coffee_pod_half_bounding_box, coffee_pod_holder_pos, coffee_pod_holder_half_bounding_box)
+
+        # coffee machine lid overlaps
+        coffee_machine_lid1_drawer1_overlap = self._calculate_boxes_overlap_percentage(coffee_machine_lid_pos, coffee_machine_lid_half_bounding_box, drawer1_pos, drawer1_half_bounding_box)
+        coffee_machine_lid1_mug1_overlap = self._calculate_boxes_overlap_percentage(coffee_machine_lid_pos, coffee_machine_lid_half_bounding_box, mug1_pos, mug1_half_bounding_box)
+        coffee_machine_lid1_coffee_pod_holder1_overlap = self._calculate_boxes_overlap_percentage(coffee_machine_lid_pos, coffee_machine_lid_half_bounding_box, coffee_pod_holder_pos, coffee_pod_holder_half_bounding_box)
+
+        # coffee pod holder overlaps
+        coffee_pod_holder1_drawer1_overlap = self._calculate_boxes_overlap_percentage(coffee_pod_holder_pos, coffee_pod_holder_half_bounding_box, drawer1_pos, drawer1_half_bounding_box)
+        coffee_pod_holder1_mug1_overlap = self._calculate_boxes_overlap_percentage(coffee_pod_holder_pos, coffee_pod_holder_half_bounding_box, mug1_pos, mug1_half_bounding_box)
+
+        # add sensors
+        @sensor(modality=modality)
+        def percent_overlap_of_mug1_bounding_box_with_drawer1_bounding_box(obs_cache):
+            return np.array([mug1_drawer1_overlap])
+        sensors += [percent_overlap_of_mug1_bounding_box_with_drawer1_bounding_box]
+        names += ["percent_overlap_of_mug1_bounding_box_with_drawer1_bounding_box"]
+
+        @sensor(modality=modality)
+        def percent_overlap_of_mug1_bounding_box_with_coffee_pod_holder1_bounding_box(obs_cache):
+            return np.array([mug1_coffee_pod_holder1_overlap])
+        sensors += [percent_overlap_of_mug1_bounding_box_with_coffee_pod_holder1_bounding_box]
+        names += ["percent_overlap_of_mug1_bounding_box_with_coffee-pod-holder1_bounding_box"]
+
+        @sensor(modality=modality)
+        def percent_overlap_of_coffee_pod1_bounding_box_with_drawer1_bounding_box(obs_cache):
+            return np.array([coffee_pod1_drawer1_overlap])
+        sensors += [percent_overlap_of_coffee_pod1_bounding_box_with_drawer1_bounding_box]
+        names += ["percent_overlap_of_coffee-pod1_bounding_box_with_drawer1_bounding_box"]
+
+        @sensor(modality=modality)
+        def percent_overlap_of_coffee_pod1_bounding_box_with_mug1_bounding_box(obs_cache):
+            return np.array([coffee_pod1_mug1_overlap])
+        sensors += [percent_overlap_of_coffee_pod1_bounding_box_with_mug1_bounding_box]
+        names += ["percent_overlap_of_coffee-pod1_bounding_box_with_mug1_bounding_box"]
+
+        @sensor(modality=modality)
+        def percent_overlap_of_coffee_pod1_bounding_box_with_coffee_pod_holder1_bounding_box(obs_cache):
+            return np.array([coffee_pod1_coffee_pod_holder1_overlap])
+        sensors += [percent_overlap_of_coffee_pod1_bounding_box_with_coffee_pod_holder1_bounding_box]
+        names += ["percent_overlap_of_coffee-pod1_bounding_box_with_coffee-pod-holder1_bounding_box"]
+
+        @sensor(modality=modality)
+        def percent_overlap_of_coffee_machine_lid1_bounding_box_with_drawer1_bounding_box(obs_cache):
+            return np.array([coffee_machine_lid1_drawer1_overlap])
+        sensors += [percent_overlap_of_coffee_machine_lid1_bounding_box_with_drawer1_bounding_box]
+        names += ["percent_overlap_of_lid1_bounding_box_with_drawer1_bounding_box"]
+
+        @sensor(modality=modality)
+        def percent_overlap_of_coffee_machine_lid1_bounding_box_with_mug1_bounding_box(obs_cache):
+            return np.array([coffee_machine_lid1_mug1_overlap])
+        sensors += [percent_overlap_of_coffee_machine_lid1_bounding_box_with_mug1_bounding_box]
+        names += ["percent_overlap_of_lid1_bounding_box_with_mug1_bounding_box"]
+
+        @sensor(modality=modality)
+        def percent_overlap_of_coffee_machine_lid1_bounding_box_with_coffee_pod_holder1_bounding_box(obs_cache):
+            return np.array([coffee_machine_lid1_coffee_pod_holder1_overlap])
+        sensors += [percent_overlap_of_coffee_machine_lid1_bounding_box_with_coffee_pod_holder1_bounding_box]
+        names += ["percent_overlap_of_lid1_bounding_box_with_coffee-pod-holder1_bounding_box"]
+
+        @sensor(modality=modality)
+        def percent_overlap_of_coffee_pod_holder1_bounding_box_with_drawer1_bounding_box(obs_cache):
+            return np.array([coffee_pod_holder1_drawer1_overlap])
+        sensors += [percent_overlap_of_coffee_pod_holder1_bounding_box_with_drawer1_bounding_box]
+        names += ["percent_overlap_of_coffee-pod-holder1_bounding_box_with_drawer1_bounding_box"]
+
+        @sensor(modality=modality)
+        def percent_overlap_of_coffee_pod_holder1_bounding_box_with_mug1_bounding_box(obs_cache):
+            return np.array([coffee_pod_holder1_mug1_overlap])
+        sensors += [percent_overlap_of_coffee_pod_holder1_bounding_box_with_mug1_bounding_box]
+        names += ["percent_overlap_of_coffee-pod-holder1_bounding_box_with_mug1_bounding_box"]
+
+        return sensors, names
 
     def check_in_mug(self, obj_name):
         """
@@ -1264,6 +1477,23 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         Returns true if drawer is open.
         """
         return (self.sim.data.qpos[self.cabinet_qpos_addr] <= -0.13)
+    
+    def check_drawer_open_percentage(self) -> float:
+        """Returns how open the drawer is as a percentage.
+
+        Returns:
+            float: Percentage of how open the drawer is (0.0 to 1.0).
+        """
+        closed_joint_angle = 0.0
+        open_joint_angle = -0.13
+        joint_angle_range = closed_joint_angle - open_joint_angle # 0.13
+        joint_angle = self.sim.data.qpos[self.cabinet_qpos_addr] # might be more negative than -0.13
+        if joint_angle < open_joint_angle:
+            return 1.0
+        elif joint_angle > closed_joint_angle:
+            return 0.0
+        return (joint_angle - open_joint_angle) / joint_angle_range
+
     
     def check_mug_upright(self):
         """Returns true if mug is upright. """
