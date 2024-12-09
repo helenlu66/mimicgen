@@ -267,12 +267,46 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             top_of_round_peg = round_peg_pos
             top_of_round_peg[2] = self.round_peg_size[1] + round_peg_pos[2]  # index 1 is the height because index 0 is radius
 
+            # get collision distances
+            robot_peg_collision_dist = self.robot_collision_dist_to_object('mount0')
+            robot_table_collision_dist = self.robot_collision_dist_to_object('table')
+            robot_square_nut_collision_dist = self.robot_collision_dist_to_object('SquareNut')
+            robot_round_nut_collision_dist = self.robot_collision_dist_to_object('RoundNut')
+
+            @sensor(modality=modality)
+            def robot_to_peg_collision_dist(obs_cache):
+                return robot_peg_collision_dist
+            sensors = [robot_to_peg_collision_dist]
+            names = ["robot_to_square-peg1_collision_dist"]
+            actives = [True]
+
+            @sensor(modality=modality)
+            def robot_to_table_collision_dist(obs_cache):
+                return robot_table_collision_dist
+            sensors += [robot_to_table_collision_dist]
+            names += ["robot_to_table1_collision_dist"]
+            actives += [True]
+
+            @sensor(modality=modality)
+            def robot_to_square_nut_collision_dist(obs_cache):
+                return robot_square_nut_collision_dist
+            sensors += [robot_to_square_nut_collision_dist]
+            names += ["robot_to_square-nut1_collision_dist"]
+            actives += [True]
+
+            @sensor(modality=modality)
+            def robot_to_round_nut_collision_dist(obs_cache):
+                return robot_round_nut_collision_dist
+            sensors += [robot_to_round_nut_collision_dist]
+            names += ["robot_to_round-nut1_collision_dist"]
+            actives += [True]
+            
             @sensor(modality=modality)
             def square_peg1_pos(obs_cache):
                 return np.array(self.sim.data.body_xpos[square_peg_id])
-            sensors = [square_peg1_pos]
-            names = ["square-peg1_pos"]
-            actives = [True]
+            sensors += [square_peg1_pos]
+            names += ["square-peg1_pos"]
+            actives += [True]
 
             @sensor(modality=modality)
             def square_peg1_quat(obs_cache):
@@ -496,6 +530,41 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
                 )
 
         return observables
+    
+    def robot_collision_dist_to_object(self, obj_name:str) -> float:
+        """get the minimum collision distance between the robot's body and the object
+        Args:
+            obj_name (str): the object name
+        Returns:
+            float: the minimum collision distance  
+        """
+        # get robot-related collision geoms
+        robot_arm_geom_names = [name for name in self.robots[0].robot_model.contact_geoms if 'visual' not in name]
+        robot_geom_ids = [self.sim.model.geom_name2id(name) for name in robot_arm_geom_names]
+        robot_geom_pos = [self.sim.data.geom_xpos[geom_id] for geom_id in robot_geom_ids]
+        gripper_geom_names = [name for name in self.robots[0].gripper.contact_geoms]
+        gripper_geom_ids = [self.sim.model.geom_name2id(name) for name in gripper_geom_names]
+        gripper_geom_pos = [self.sim.data.geom_xpos[geom_id] for geom_id in gripper_geom_ids]
+        # get object-related collision geoms
+        obj_geom_names = []
+        for name in self.sim.model.geom_names:
+            if name is None:
+                continue
+            if obj_name.lower() in name.lower() and 'visual' not in name:
+                obj_geom_names.append(name)
+        obj_geom_ids = [self.sim.model.geom_name2id(name) for name in obj_geom_names]
+        obj_geom_pos = [self.sim.data.geom_xpos[geom_id] for geom_id in obj_geom_ids]
+        # check for the closest distance between robot and peg
+        min_dist = float('inf')
+        for robot_pos in robot_geom_pos:
+            for peg_pos in obj_geom_pos:
+                dist = np.linalg.norm(robot_pos - peg_pos)
+                min_dist = min(min_dist, dist)
+        for robot_pos in gripper_geom_pos:
+            for peg_pos in obj_geom_pos:
+                dist = np.linalg.norm(robot_pos - peg_pos)
+                min_dist = min(min_dist, dist)
+        return min_dist
 
     
     #region Novelty Detectors
