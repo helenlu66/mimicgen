@@ -2,6 +2,7 @@
 #
 # Licensed under the NVIDIA Source Code License [see LICENSE for details].
 
+import mujoco
 import numpy as np
 from six import with_metaclass
 
@@ -554,15 +555,26 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
                 obj_geom_names.append(name)
         obj_geom_ids = [self.sim.model.geom_name2id(name) for name in obj_geom_names]
         obj_geom_pos = [self.sim.data.geom_xpos[geom_id] for geom_id in obj_geom_ids]
-        # check for the closest distance between robot and peg
+        # if there is collision, return 0
+        if self.check_contact(robot_arm_geom_names, obj_geom_names) or self.check_contact(gripper_geom_names, obj_geom_names):
+            return 0
+        # check for the closest distance between robot and object
         min_dist = float('inf')
+        # for obj_geom_id in obj_geom_ids:
+        #     for robot_geom_id in robot_geom_ids:
+        #         dist = mujoco.mjbindings.mjlib.mj_geoDistance(self.sim.model, self.sim.data, robot_geom_id, obj_geom_id, 0.03)
+        #         min_dist = min(min_dist, dist)
+        #     for gripper_geom_id in gripper_geom_ids:
+        #         dist = mujoco.mj_geoDistance(self.sim.model, self.sim.data, gripper_geom_id, obj_geom_id, 0.03)
+        #         min_dist = min(min_dist, dist)
+        # check for the closest distance between robot and peg
         for robot_pos in robot_geom_pos:
-            for peg_pos in obj_geom_pos:
-                dist = np.linalg.norm(robot_pos - peg_pos)
+            for obj_pos in obj_geom_pos:
+                dist = np.linalg.norm(robot_pos - obj_pos)
                 min_dist = min(min_dist, dist)
         for robot_pos in gripper_geom_pos:
-            for peg_pos in obj_geom_pos:
-                dist = np.linalg.norm(robot_pos - peg_pos)
+            for obj_pos in obj_geom_pos:
+                dist = np.linalg.norm(robot_pos - obj_pos)
                 min_dist = min(min_dist, dist)
         return min_dist
 
