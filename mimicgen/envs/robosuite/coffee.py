@@ -618,11 +618,15 @@ class Coffee_Pre_Novelty(SingleArmEnv_MG):
         """
         Returns True if the object is directly on the table.
         """
+        if obj_name == 'coffee-pod':
+            obj_name = 'coffee_pod'
         if hasattr(self, obj_name):
             obj_bounding_box = getattr(self, obj_name).get_bounding_box_half_size()
-        elif obj_name == 'coffee_machine_lid':
+        elif obj_name == 'coffee-machine-lid':
+            obj_name = 'coffee_machine_lid'
             obj_bounding_box = self.coffee_machine.lid_size
-        elif obj_name == 'coffee_pod_holder':
+        elif obj_name == 'coffee-pod-holder':
+            obj_name = 'coffee_pod_holder'
             obj_bounding_box = self.pod_holder_size
         elif obj_name == 'drawer':
             obj_bounding_box = self.cabinet_object.get_bounding_box_half_size()
@@ -1451,6 +1455,7 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         """
         Returns true if object is in the mug.
         """
+        obj_name = obj_name.replace('-', '_')
         # get mug's half bounding box and pos
         mug_half_bounding_box = self.mug.get_bounding_box_half_size()
         mug_pos = self.sim.data.body_xpos[self.obj_body_id["mug"]]
@@ -1466,7 +1471,8 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         Returns true if object is in the drawer.
         """
         # check if object is in contact with the inside of the drawer
-        assert obj_name in ["mug", "coffee_pod"]
+        assert obj_name in ["mug", "coffee-pod"]
+        obj_name = obj_name.replace('-', '_')
         drawer_bottom_geom = "CabinetObject_drawer_bottom"
         obj_in_drawer = self.check_contact(drawer_bottom_geom, getattr(self, obj_name))
         return obj_in_drawer

@@ -11,6 +11,7 @@ import os
 import random
 from collections import OrderedDict
 from copy import deepcopy
+import xml.etree.ElementTree as ET
 
 import numpy as np
 
@@ -352,6 +353,39 @@ class MugCleanup(SingleArmEnv_MG):
                                                              custom_material=deepcopy(material))
             obj_body.asset.append(tex_element)
             obj_body.asset.append(mat_element)
+
+        # Example usage
+        XML_ASSETS_BASE_PATH = os.path.join(mimicgen.__path__[0], "models/robosuite/assets")
+        xml_path = os.path.join(XML_ASSETS_BASE_PATH, "objects/drawer.xml")
+
+        # Calculate the bounding length of the cabinet and drawer
+        cabinet_length, drawer_length = self.get_cabinet_and_drawer_bounding_length(xml_path)
+
+        print(f"Cabinet Bounding Length: {cabinet_length}")
+        print(f"Drawer Bounding Length: {drawer_length}")
+
+        # Example usage
+        body_name = "drawer_link"  # Replace with the body name you want to measure
+
+        # Get bounding box dimensions
+        length, width, height = self.get_bounding_box_dimensions(xml_path, body_name)
+
+        print(f"Bounding Box Dimensions for '{body_name}':")
+        print(f"Length (X): {length}")
+        print(f"Width (Y): {width}")
+        print(f"Height (Z): {height}")
+
+        # Example usage
+        body_name = "base"  # Replace with the body name you want to measure
+
+        # Get bounding box dimensions
+        length, width, height = self.get_bounding_box_dimensions(xml_path, body_name)
+
+        print(f"Bounding Box Dimensions for '{body_name}':")
+        print(f"Length (X): {length}")
+        print(f"Width (Y): {width}")
+        print(f"Height (Z): {height}")
+
 
     def _get_object_model(self):
         """
@@ -699,6 +733,117 @@ class MugCleanup(SingleArmEnv_MG):
             bool: True if the drawer is open, False otherwise
         """
         return self.sim.data.qpos[self.drawer_qpos_addr] < -0.01
+    
+    def get_bounding_box_dimensions(self, xml_path: str, body_name: str):
+        """
+        Computes the bounding box dimensions (length, width, height) for a specific body in a Mujoco XML.
+        
+        Args:
+        - xml_path (str): Path to the Mujoco XML file.
+        - body_name (str): Name of the body whose bounding box dimensions are to be calculated.
+
+        Returns:
+        - tuple: A tuple containing (length, width, height)
+        """
+        # Parse the XML file
+        tree = ET.parse(xml_path)
+        root = tree.getroot()
+
+        # Find all geoms in the specified body
+        geoms = root.findall(f".//body[@name='{body_name}']//geom")
+
+        # Initialize bounding box extents
+        min_x, max_x = float('inf'), float('-inf')
+        min_y, max_y = float('inf'), float('-inf')
+        min_z, max_z = float('inf'), float('-inf')
+
+        # Compute bounding box for each geom
+        for geom in geoms:
+            pos = list(map(float, geom.get('pos').split()))  # [x, y, z]
+            size = list(map(float, geom.get('size').split()))
+            geom_type = geom.get('type', 'box')  # Default to 'box' if type is not specified
+
+            if geom_type == 'box':
+                # Box has 3 size elements: [x, y, z]
+                dx, dy, dz = size[0], size[1], size[2]
+            elif geom_type in ['capsule', 'cylinder']:
+                # Capsule/Cylinder have 2 size elements: [radius, half-length]
+                dx = size[1]  # length of the capsule/cylinder
+                dy = dz = size[0]  # radius determines the y and z size
+            elif geom_type == 'sphere':
+                # Sphere has 1 size element: [radius]
+                dx = dy = dz = size[0]
+            elif geom_type == 'plane':
+                # Plane has 2 size elements: [x, y] (z is typically flat)
+                dx = size[0]
+                dy = size[1]
+                dz = 0  # Planes don't have height (they're flat)
+            else:
+                # If the type is unknown, assume it is a box with default size
+                dx = dy = dz = 0
+
+            # Handle cases where the position may not have all 3 components
+            px = pos[0] if len(pos) > 0 else 0
+            py = pos[1] if len(pos) > 1 else 0
+            pz = pos[2] if len(pos) > 2 else 0
+
+            min_x = min(min_x, px - dx)
+            max_x = max(max_x, px + dx)
+
+            min_y = min(min_y, py - dy)
+            max_y = max(max_y, py + dy)
+
+            min_z = min(min_z, pz - dz)
+            max_z = max(max_z, pz + dz)
+
+        # Calculate dimensions
+        length = max_x - min_x  # Extent along x-axis
+        width = max_y - min_y   # Extent along y-axis
+        height = max_z - min_z  # Extent along z-axis
+
+        return length, width, height
+
+    def get_cabinet_and_drawer_bounding_length(self, xml_path: str):
+        """
+        Computes the maximum bounding box length for the cabinet and drawer.
+        
+        Args:
+        - xml_path (str): Path to the Mujoco XML file generated by MimicGen.
+        
+        Returns:
+        - tuple: A tuple containing (cabinet_length, drawer_length)
+        """
+        # Parse the XML file
+        tree = ET.parse(xml_path)
+        root = tree.getroot()
+
+        def compute_bounding_length(geoms):
+            """
+            Computes the maximum bounding box length of a set of geoms.
+            Args:
+            - geoms (list): List of <geom> elements.
+            
+            Returns:
+            - float: Length of the bounding box.
+            """
+            min_x, max_x = float('inf'), float('-inf')
+            for geom in geoms:
+                pos_x = float(geom.get('pos').split()[0])
+                size_x = float(geom.get('size').split()[0])
+                min_x = min(min_x, pos_x - size_x)
+                max_x = max(max_x, pos_x + size_x)
+            return max_x - min_x
+
+        # Extract cabinet and drawer geoms
+        cabinet_geoms = root.findall(".//body[@name='base']//geom")
+        drawer_geoms = root.findall(".//body[@name='drawer_link']//geom")
+
+        # Compute bounding box lengths
+        cabinet_length = compute_bounding_length(cabinet_geoms)
+        drawer_length = compute_bounding_length(drawer_geoms)
+
+        return cabinet_length, drawer_length
+
 
 class MugCleanup_D0(MugCleanup):
     """Rename base class for convenience."""
