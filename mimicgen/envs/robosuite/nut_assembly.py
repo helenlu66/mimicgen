@@ -269,10 +269,10 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             top_of_round_peg[2] = self.round_peg_size[1] + round_peg_pos[2]  # index 1 is the height because index 0 is radius
 
             # get collision distances
-            robot_peg_collision_dist = self.robot_collision_dist_to_object('mount0')
-            robot_table_collision_dist = self.robot_collision_dist_to_object('table')
-            robot_square_nut_collision_dist = self.robot_collision_dist_to_object('SquareNut')
-            robot_round_nut_collision_dist = self.robot_collision_dist_to_object('RoundNut')
+            robot_peg_collision_dist = self.sim.robot_obj_collision_dist('mount0')
+            robot_table_collision_dist = self.sim.robot_obj_collision_dist('table')
+            robot_square_nut_collision_dist = self.sim.robot_obj_collision_dist('SquareNut')
+            robot_round_nut_collision_dist = self.sim.robot_obj_collision_dist('RoundNut')
 
             @sensor(modality=modality)
             def robot_to_peg_collision_dist(obs_cache):
@@ -532,52 +532,20 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
 
         return observables
     
-    def robot_collision_dist_to_object(self, obj_name:str) -> float:
-        """get the minimum collision distance between the robot's body and the object
-        Args:
-            obj_name (str): the object name
-        Returns:
-            float: the minimum collision distance  
-        """
-        # get robot-related collision geoms
-        robot_arm_geom_names = [name for name in self.robots[0].robot_model.contact_geoms if 'visual' not in name]
-        robot_geom_ids = [self.sim.model.geom_name2id(name) for name in robot_arm_geom_names]
-        robot_geom_pos = [self.sim.data.geom_xpos[geom_id] for geom_id in robot_geom_ids]
-        gripper_geom_names = [name for name in self.robots[0].gripper.contact_geoms]
-        gripper_geom_ids = [self.sim.model.geom_name2id(name) for name in gripper_geom_names]
-        gripper_geom_pos = [self.sim.data.geom_xpos[geom_id] for geom_id in gripper_geom_ids]
-        # get object-related collision geoms
-        obj_geom_names = []
-        for name in self.sim.model.geom_names:
-            if name is None:
-                continue
-            if obj_name.lower() in name.lower() and 'visual' not in name:
-                obj_geom_names.append(name)
-        obj_geom_ids = [self.sim.model.geom_name2id(name) for name in obj_geom_names]
-        obj_geom_pos = [self.sim.data.geom_xpos[geom_id] for geom_id in obj_geom_ids]
-        # if there is collision, return 0
-        if self.check_contact(robot_arm_geom_names, obj_geom_names) or self.check_contact(gripper_geom_names, obj_geom_names):
-            return 0
-        # check for the closest distance between robot and object
-        min_dist = float('inf')
-        # for obj_geom_id in obj_geom_ids:
-        #     for robot_geom_id in robot_geom_ids:
-        #         dist = mujoco.mjbindings.mjlib.mj_geoDistance(self.sim.model, self.sim.data, robot_geom_id, obj_geom_id, 0.03)
-        #         min_dist = min(min_dist, dist)
-        #     for gripper_geom_id in gripper_geom_ids:
-        #         dist = mujoco.mj_geoDistance(self.sim.model, self.sim.data, gripper_geom_id, obj_geom_id, 0.03)
-        #         min_dist = min(min_dist, dist)
-        # check for the closest distance between robot and peg
-        for robot_pos in robot_geom_pos:
-            for obj_pos in obj_geom_pos:
-                dist = np.linalg.norm(robot_pos - obj_pos)
-                min_dist = min(min_dist, dist)
-        for robot_pos in gripper_geom_pos:
-            for obj_pos in obj_geom_pos:
-                dist = np.linalg.norm(robot_pos - obj_pos)
-                min_dist = min(min_dist, dist)
-        return min_dist
 
+    def robot_obj_collision_dist(self, obj_name):
+        """Get the smallest distance between the robots in the scene and the object.
+
+        Args:
+            obj_name (str): name of the object
+        """
+        smallest_dist = np.inf
+        assert hasattr(self, "geom_dists"), "geom_dists not computed."
+        for robot_geom in self.geom_dists:
+            for obj_geom_name in self.geom_dists[robot_geom]:
+                if obj_name in obj_geom_name:
+                    smallest_dist = min(smallest_dist, self.geom_dists[robot_geom][obj_geom_name])
+        return smallest_dist
     
     #region Novelty Detectors
     def check_directly_on_table(self, obj_name):
