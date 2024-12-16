@@ -269,37 +269,66 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             top_of_round_peg[2] = self.round_peg_size[1] + round_peg_pos[2]  # index 1 is the height because index 0 is radius
 
             # get collision distances
-            robot_peg_collision_dist = self.sim.robot_obj_collision_dist('mount0')
-            robot_table_collision_dist = self.sim.robot_obj_collision_dist('table')
-            robot_square_nut_collision_dist = self.sim.robot_obj_collision_dist('SquareNut')
-            robot_round_nut_collision_dist = self.sim.robot_obj_collision_dist('RoundNut')
+            robot_peg_collision_dist, robot_peg_closest_point = self.sim.robot_obj_collision_dist('mount0')
+            robot_table_collision_dist, robot_table_closest_point = self.sim.robot_obj_collision_dist('table')
+            robot_square_nut_collision_dist, robot_square_nut_closest_point = self.sim.robot_obj_collision_dist('SquareNut')
+            robot_round_nut_collision_dist, robot_round_nut_closest_point = self.sim.robot_obj_collision_dist('RoundNut')
+
+            # add sensors for collision distance and closest points
+            # @sensor(modality=modality)
+            # def robot_body_to_peg_closest_point(obs_cache):
+            #     return robot_peg_closest_point
+            # sensors = [robot_body_to_peg_closest_point]
+            # names = ["robot_body_to_square-peg1_closest_point"]
+            # actives = [True]
+
+            # @sensor(modality=modality)
+            # def robot_body_to_table_closest_point(obs_cache):
+            #     return robot_table_closest_point
+            # sensors += [robot_body_to_table_closest_point]
+            # names += ["robot_body_to_table1_closest_point"]
+            # actives += [True]
+
+            # @sensor(modality=modality)
+            # def robot_body_to_square_nut_closest_point(obs_cache):
+            #     return robot_square_nut_closest_point
+            # sensors += [robot_body_to_square_nut_closest_point]
+            # names += ["robot_body_to_square-nut1_closest_point"]
+            # actives += [True]
+
+            # @sensor(modality=modality)
+            # def robot_body_to_round_nut_closest_point(obs_cache):
+            #     return robot_round_nut_closest_point
+            # sensors += [robot_body_to_round_nut_closest_point]
+            # names += ["robot_body_to_round-nut1_closest_point"]
+            # actives += [True]
 
             @sensor(modality=modality)
-            def robot_to_peg_collision_dist(obs_cache):
-                return robot_peg_collision_dist
-            sensors = [robot_to_peg_collision_dist]
-            names = ["robot_to_square-peg1_collision_dist"]
+            def robot_body_to_peg_collision_dist(obs_cache):
+                return [robot_peg_collision_dist] + robot_peg_closest_point
+            sensors = [robot_body_to_peg_collision_dist]
+            names = ["robot_body_to_square-peg1_collision_dist"]
             actives = [True]
 
             @sensor(modality=modality)
-            def robot_to_table_collision_dist(obs_cache):
-                return robot_table_collision_dist
-            sensors += [robot_to_table_collision_dist]
-            names += ["robot_to_table1_collision_dist"]
+            def robot_body_to_table_collision_dist(obs_cache):
+                return [robot_table_collision_dist] + robot_table_closest_point
+            sensors += [robot_body_to_table_collision_dist]
+            names += ["robot_body_to_table1_collision_dist"]
             actives += [True]
 
             @sensor(modality=modality)
-            def robot_to_square_nut_collision_dist(obs_cache):
-                return robot_square_nut_collision_dist
-            sensors += [robot_to_square_nut_collision_dist]
-            names += ["robot_to_square-nut1_collision_dist"]
+            def robot_body_to_square_nut_collision_dist(obs_cache):
+                return [robot_square_nut_collision_dist] + robot_square_nut_closest_point
+            sensors += [robot_body_to_square_nut_collision_dist]
+            names += ["robot_body_to_square-nut1_collision_dist"]
             actives += [True]
 
             @sensor(modality=modality)
-            def robot_to_round_nut_collision_dist(obs_cache):
-                return robot_round_nut_collision_dist
-            sensors += [robot_to_round_nut_collision_dist]
-            names += ["robot_to_round-nut1_collision_dist"]
+            def robot_body_to_round_nut_collision_dist(obs_cache):
+                return [robot_round_nut_collision_dist] + robot_round_nut_closest_point
+            sensors += [robot_body_to_round_nut_collision_dist]
+            names += ["robot_body_to_round-nut1_collision_dist"]
             actives += [True]
             
             @sensor(modality=modality)
@@ -338,7 +367,7 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
                 max_dist[2] += 1.0
                 return max_dist
             sensors += [gripper1_to_obj_max_absolute_dist]
-            names += ["gripper1_to_obj_max_absolute_dist"]
+            names += ["gripper1_to_obj_max_possible_dist"]
             actives += [True]
 
             @sensor(modality=modality)
