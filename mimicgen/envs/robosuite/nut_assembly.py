@@ -303,7 +303,7 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             # names += ["robot_body_to_round-nut1_closest_point"]
             # actives += [True]
 
-            @sensor(modality=modality)
+            @sensor(modality='object_collision')
             def robot_body_to_peg_collision_dist(obs_cache):
                 smallest_dist = np.inf
                 closest_point = [0, 0, 0]
@@ -320,7 +320,7 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             names = ["robot_body_to_square-peg1_collision_dist"]
             actives = [True]
 
-            @sensor(modality=modality)
+            @sensor(modality='object_collision')
             def robot_body_to_table_collision_dist(obs_cache):
                 smallest_dist = np.inf
                 closest_point = [None, None, None]
@@ -337,7 +337,7 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             names += ["robot_body_to_table1_collision_dist"]
             actives += [True]
 
-            @sensor(modality=modality)
+            @sensor(modality='object_collision')
             def robot_body_to_square_nut_collision_dist(obs_cache):
                 smallest_dist = np.inf
                 closest_point = [None, None, None]
@@ -354,7 +354,7 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             names += ["robot_body_to_square-nut1_collision_dist"]
             actives += [True]
 
-            @sensor(modality=modality)
+            @sensor(modality='object_collision')
             def robot_body_to_round_nut_collision_dist(obs_cache):
                 smallest_dist = np.inf
                 closest_point = [None, None, None]
