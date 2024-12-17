@@ -269,10 +269,10 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             top_of_round_peg[2] = self.round_peg_size[1] + round_peg_pos[2]  # index 1 is the height because index 0 is radius
 
             # get collision distances
-            robot_peg_collision_dist, robot_peg_closest_point = self.sim.robot_obj_collision_dist('mount0')
-            robot_table_collision_dist, robot_table_closest_point = self.sim.robot_obj_collision_dist('table')
-            robot_square_nut_collision_dist, robot_square_nut_closest_point = self.sim.robot_obj_collision_dist('SquareNut')
-            robot_round_nut_collision_dist, robot_round_nut_closest_point = self.sim.robot_obj_collision_dist('RoundNut')
+            # robot_peg_collision_dist, robot_peg_closest_point = self.sim.robot_obj_collision_dist('mount0')
+            # robot_table_collision_dist, robot_table_closest_point = self.sim.robot_obj_collision_dist('table')
+            # robot_square_nut_collision_dist, robot_square_nut_closest_point = self.sim.robot_obj_collision_dist('SquareNut')
+            # robot_round_nut_collision_dist, robot_round_nut_closest_point = self.sim.robot_obj_collision_dist('RoundNut')
 
             # add sensors for collision distance and closest points
             # @sensor(modality=modality)
@@ -305,28 +305,68 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
 
             @sensor(modality=modality)
             def robot_body_to_peg_collision_dist(obs_cache):
-                return [robot_peg_collision_dist] + robot_peg_closest_point
+                smallest_dist = np.inf
+                closest_point = [0, 0, 0]
+                assert hasattr(self.sim.model, "geom_dists"), "geom_dists not computed."
+                for robot_geom in self.sim.model.geom_dists:
+                    for obj_geom_name in self.sim.model.geom_dists[robot_geom]:
+                        if 'peg1' not in obj_geom_name:
+                            continue
+                        else:
+                            smallest_dist = self.sim.model.geom_dists[robot_geom][obj_geom_name]['dist']
+                            closest_point = self.sim.model.geom_dists[robot_geom][obj_geom_name]['closest_point']
+                return [smallest_dist] + list(closest_point)
             sensors = [robot_body_to_peg_collision_dist]
             names = ["robot_body_to_square-peg1_collision_dist"]
             actives = [True]
 
             @sensor(modality=modality)
             def robot_body_to_table_collision_dist(obs_cache):
-                return [robot_table_collision_dist] + robot_table_closest_point
+                smallest_dist = np.inf
+                closest_point = [None, None, None]
+                assert hasattr(self.sim.model, "geom_dists"), "geom_dists not computed."
+                for robot_geom in self.sim.model.geom_dists:
+                    for obj_geom_name in self.sim.model.geom_dists[robot_geom]:
+                        if 'table' not in obj_geom_name:
+                            continue
+                        else:
+                            smallest_dist = self.sim.model.geom_dists[robot_geom][obj_geom_name]['dist']
+                            closest_point = self.sim.model.geom_dists[robot_geom][obj_geom_name]['closest_point']
+                return [smallest_dist] + list(closest_point)
             sensors += [robot_body_to_table_collision_dist]
             names += ["robot_body_to_table1_collision_dist"]
             actives += [True]
 
             @sensor(modality=modality)
             def robot_body_to_square_nut_collision_dist(obs_cache):
-                return [robot_square_nut_collision_dist] + robot_square_nut_closest_point
+                smallest_dist = np.inf
+                closest_point = [None, None, None]
+                assert hasattr(self.sim.model, "geom_dists"), "geom_dists not computed."
+                for robot_geom in self.sim.model.geom_dists:
+                    for obj_geom_name in self.sim.model.geom_dists[robot_geom]:
+                        if 'SquareNut' not in obj_geom_name:
+                            continue
+                        else:
+                            smallest_dist = self.sim.model.geom_dists[robot_geom][obj_geom_name]['dist']
+                            closest_point = self.sim.model.geom_dists[robot_geom][obj_geom_name]['closest_point']
+                return [smallest_dist] + list(closest_point)
             sensors += [robot_body_to_square_nut_collision_dist]
             names += ["robot_body_to_square-nut1_collision_dist"]
             actives += [True]
 
             @sensor(modality=modality)
             def robot_body_to_round_nut_collision_dist(obs_cache):
-                return [robot_round_nut_collision_dist] + robot_round_nut_closest_point
+                smallest_dist = np.inf
+                closest_point = [None, None, None]
+                assert hasattr(self.sim.model, "geom_dists"), "geom_dists not computed."
+                for robot_geom in self.sim.model.geom_dists:
+                    for obj_geom_name in self.sim.model.geom_dists[robot_geom]:
+                        if 'RoundNut' not in obj_geom_name:
+                            continue
+                        else:
+                            smallest_dist = self.sim.model.geom_dists[robot_geom][obj_geom_name]['dist']
+                            closest_point = self.sim.model.geom_dists[robot_geom][obj_geom_name]['closest_point']
+                return [smallest_dist] + list(closest_point)
             sensors += [robot_body_to_round_nut_collision_dist]
             names += ["robot_body_to_round-nut1_collision_dist"]
             actives += [True]
