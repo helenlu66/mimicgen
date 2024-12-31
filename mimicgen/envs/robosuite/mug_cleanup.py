@@ -694,13 +694,26 @@ class MugCleanup(SingleArmEnv_MG):
             bool: True if the object is in the drawer, False otherwise
         """
 
-        # Check if the object is in contact with the bottom of the drawer
         if obj_name == "mug":
-            return self.check_contact(self.mug, "DrawerObject_drawer_bottom")
+            contact = self.check_contact(self.mug, "DrawerObject_drawer_bottom") # Check if the object is in contact with the bottom of the drawer
         elif obj_name == "cube":
-            return self.check_contact(self.cube, "DrawerObject_drawer_bottom")
+            contact = self.check_contact(self.cube, "DrawerObject_drawer_bottom") # Check if the object is in contact with the bottom of the drawer
         else:
             raise ValueError("Invalid object name: {}".format(obj_name))
+        
+        if contact:
+            return True
+        else: 
+            # check if object bottom is above drawer bounding box top
+            obj_pos = self.sim.data.body_xpos[self.obj_body_id[obj_name]]
+            obj_half_bounding_box = getattr(self, obj_name).get_bounding_box_half_size()
+            obj_bot = obj_pos[2] - obj_half_bounding_box[2]
+
+            drawer_pos = self.sim.data.body_xpos[self.obj_body_id["drawer"]]
+            drawer_half_bounding_box = self.drawer.get_bounding_box_half_size()
+            drawer_top = drawer_pos[2] + drawer_half_bounding_box[2]
+            above_drawer = obj_bot > drawer_top
+
             
     def check_in_mug(self, obj_name):
         """
@@ -960,36 +973,7 @@ class CubeCleanup_Mug_Novelty(MugCleanup):
         observables['drawer1_joint_pos'] = observables.pop('drawer_joint_pos')
 
         return observables
-    
-    def _calculate_boxes_overlap_percentage(self, obj1_pos, obj1_half_bounding_box, obj2_pos, obj2_half_bounding_box):
-        """calculate the percentage of obj1's bounding box that overlaps with obj2's bounding box
 
-        Args:
-            obj1_pos (np.array): position of obj1
-            obj1_half_bounding_box (np.array): half bounding box size of obj1
-            obj2_pos (np.array): position of obj2
-            obj2_half_bounding_box (np.array): half bounding box size of obj2
-        """
-        x1, y1, z1 = obj1_pos
-        hx1, hy1, hz1 = obj1_half_bounding_box
-        x2, y2, z2 = obj2_pos
-        hx2, hy2, hz2 = obj2_half_bounding_box
-
-        # calculate the min and max coordinates of the bounding boxes
-        min1 = [x1 - hx1, y1 - hy1, z1 - hz1]
-        max1 = [x1 + hx1, y1 + hy1, z1 + hz1]
-        min2 = [x2 - hx2, y2 - hy2, z2 - hz2]
-        max2 = [x2 + hx2, y2 + hy2, z2 + hz2]
-
-        # calculate the overlap along each axis
-        overlap = [max(0, min1[i] - max2[i], max1[i] - min2[i]) for i in range(3)]
-        # calculate the volume of the overlap
-        overlap_volume = overlap[0] * overlap[1] * overlap[2]
-        # calculate the volume of obj1
-        obj1_volume = (2 * hx1) * (2 * hy1) * (2 * hz1)
-        # calculate the percentage of obj1's volume that overlaps with obj2
-        overlap_percentage = overlap_volume / obj1_volume
-        return overlap_percentage
     
     def _create_overlap_sensors(self):
         """
@@ -1001,59 +985,48 @@ class CubeCleanup_Mug_Novelty(MugCleanup):
         # Get robot prefix and define observables modality
         pf = self.robots[0].robot_model.naming_prefix
         modality = "object"
-        block1_id = self.sim.model.body_name2id(self.cube.root_body)
-        drawer1_id = self.sim.model.body_name2id(self.drawer.root_body)
-        mug1_id = self.sim.model.body_name2id(self.mug.root_body)
-        block1_pos = self.sim.data.body_xpos[block1_id]
-        block1_half_bounding_box = self.cube.get_bounding_box_half_size()
-        mug1_pos = self.sim.data.body_xpos[mug1_id]
-        mug1_half_bounding_box = self.mug.get_bounding_box_half_size()
-        drawer1_pos = self.sim.data.body_xpos[drawer1_id]
-        drawer1_half_bounding_box = self.drawer.get_bounding_box_half_size()
-        drawer1_half_bounding_box[1] = self.drawer.horizontal_radius # use the horizontal radius for the y-axis since for some reason the half bounding box's y is 0
-
-        block1_mug1_overlap = self._calculate_boxes_overlap_percentage(block1_pos, block1_half_bounding_box, mug1_pos, mug1_half_bounding_box)
-        block1_drawer1_overlap = self._calculate_boxes_overlap_percentage(block1_pos, block1_half_bounding_box, drawer1_pos, drawer1_half_bounding_box)
-        mug1_drawer1_overlap = self._calculate_boxes_overlap_percentage(mug1_pos, mug1_half_bounding_box, drawer1_pos, drawer1_half_bounding_box)
-        mug1_block1_overlap = self._calculate_boxes_overlap_percentage(mug1_pos, mug1_half_bounding_box, block1_pos, block1_half_bounding_box)
-        drawer1_block1_overlap = self._calculate_boxes_overlap_percentage(drawer1_pos, drawer1_half_bounding_box, block1_pos, block1_half_bounding_box)
-        drawer1_mug1_overlap = self._calculate_boxes_overlap_percentage(drawer1_pos, drawer1_half_bounding_box, mug1_pos, mug1_half_bounding_box)
+        block1_mug1_overlap = self.estimate_obj1_overlap_w_obj2("cube", "mug")
+        block1_drawer1_overlap = self.estimate_obj1_overlap_w_obj2("cube", "drawer")
+        mug1_drawer1_overlap = self.estimate_obj1_overlap_w_obj2("mug", "drawer")
+        mug1_block1_overlap = self.estimate_obj1_overlap_w_obj2("mug", "cube")
+        drawer1_block1_overlap = self.estimate_obj1_overlap_w_obj2("drawer", "cube")
+        drawer1_mug1_overlap = self.estimate_obj1_overlap_w_obj2("drawer", "mug")
 
         @sensor(modality=modality)
-        def percent_overlap_of_block1_bounding_box_with_mug1_bounding_box(obs_cache):
+        def percent_overlap_of_block1_with_mug1(obs_cache):
             return block1_mug1_overlap
-        sensors += [percent_overlap_of_block1_bounding_box_with_mug1_bounding_box]
-        names += ["percent_overlap_of_block1_bounding_box_with_mug1_bounding_box"]
+        sensors += [percent_overlap_of_block1_with_mug1]
+        names += ["percent_overlap_of_block1_with_mug1"]
 
         @sensor(modality=modality)
-        def percent_overlap_of_block1_bounding_box_with_drawer1_bounding_box(obs_cache):
+        def percent_overlap_of_block1_with_drawer1(obs_cache):
             return block1_drawer1_overlap
-        sensors += [percent_overlap_of_block1_bounding_box_with_drawer1_bounding_box]
-        names += ["percent_overlap_of_block1_bounding_box_with_drawer1_bounding_box"]
+        sensors += [percent_overlap_of_block1_with_drawer1]
+        names += ["percent_overlap_of_block1_with_drawer1"]
 
         @sensor(modality=modality)
-        def percent_overlap_of_mug1_bounding_box_with_drawer1_bounding_box(obs_cache):
+        def percent_overlap_of_mug1_with_drawer1(obs_cache):
             return mug1_drawer1_overlap
-        sensors += [percent_overlap_of_mug1_bounding_box_with_drawer1_bounding_box]
-        names += ["percent_overlap_of_mug1_bounding_box_with_drawer1_bounding_box"]
+        sensors += [percent_overlap_of_mug1_with_drawer1]
+        names += ["percent_overlap_of_mug1_with_drawer1"]
 
         @sensor(modality=modality)
-        def percent_overlap_of_mug1_bounding_box_with_block1_bounding_box(obs_cache):
+        def percent_overlap_of_mug1_with_block1(obs_cache):
             return mug1_block1_overlap
-        sensors += [percent_overlap_of_mug1_bounding_box_with_block1_bounding_box]
-        names += ["percent_overlap_of_mug1_bounding_box_with_block1_bounding_box"]
+        sensors += [percent_overlap_of_mug1_with_block1]
+        names += ["percent_overlap_of_mug1_with_block1"]
 
         @sensor(modality=modality)
-        def percent_overlap_of_drawer1_bounding_box_with_block1_bounding_box(obs_cache):
+        def percent_overlap_of_drawer1_with_block1(obs_cache):
             return drawer1_block1_overlap
-        sensors += [percent_overlap_of_drawer1_bounding_box_with_block1_bounding_box]
-        names += ["percent_overlap_of_drawer1_bounding_box_with_block1_bounding_box"]
+        sensors += [percent_overlap_of_drawer1_with_block1]
+        names += ["percent_overlap_of_drawer1_with_block1"]
 
         @sensor(modality=modality)
-        def percent_overlap_of_drawer1_bounding_box_with_mug1_bounding_box(obs_cache):
+        def percent_overlap_of_drawer1_with_mug1(obs_cache):
             return drawer1_mug1_overlap
-        sensors += [percent_overlap_of_drawer1_bounding_box_with_mug1_bounding_box]
-        names += ["percent_overlap_of_drawer1_bounding_box_with_mug1_bounding_box"]
+        sensors += [percent_overlap_of_drawer1_with_mug1]
+        names += ["percent_overlap_of_drawer1_with_mug1"]
 
         return sensors, names
 
@@ -1139,6 +1112,123 @@ class CubeCleanup_Mug_Novelty(MugCleanup):
                     active=True,
                 )
         return observables
+    
+    def estimate_obj1_overlap_w_obj2(self, obj1_name, obj2_name):
+        """Estimate the percent overlap between two objects' bounding boxes. For example, if obj1 is fully inside obj2, the percentage is 1.
+
+        Args:
+            obj1_name (str): name of the first object
+            obj2_name (str): name of the second object
+        Returns:
+            float: percentage of obj1's bounding box that overlaps with obj2's bounding box in [0, 1]
+        """
+        obj1 = getattr(self, obj1_name)
+        obj1_id = self.sim.model.body_name2id(obj1.root_body)
+        obj1_pos = self.sim.data.body_xpos[obj1_id]
+        obj1_quat = self.sim.data.body_xquat[obj1_id]
+        if obj1_name == "drawer":
+            XML_ASSETS_BASE_PATH = os.path.join(mimicgen.__path__[0], "models/robosuite/assets")
+            xml_path = os.path.join(XML_ASSETS_BASE_PATH, "objects/drawer.xml")
+            body_name = "drawer_link"  
+            # Get bounding box dimensions
+            length, width, height = self.get_bounding_box_dimensions(xml_path, body_name)
+            obj1_half_bounding_box = np.array([length / 2, width / 2, height / 2])
+        else:
+            obj1_half_bounding_box = obj1.get_bounding_box_half_size()
+            length, width, height = obj1_half_bounding_box[0] * 2, obj1_half_bounding_box[1] * 2, obj1_half_bounding_box[2] * 2
+        obj2 = getattr(self, obj2_name)
+        obj2_id = self.sim.model.body_name2id(obj2.root_body)
+        obj2_pos = self.sim.data.body_xpos[obj2_id]
+        obj2_quat = self.sim.data.body_xquat[obj2_id]
+        if obj2_name == "drawer":
+            XML_ASSETS_BASE_PATH = os.path.join(mimicgen.__path__[0], "models/robosuite/assets")
+            xml_path = os.path.join(XML_ASSETS_BASE_PATH, "objects/drawer.xml")
+            body_name = "drawer_link"  
+            # Get bounding box dimensions
+            length, width, height = self.get_bounding_box_dimensions(xml_path, body_name)
+            obj2_half_bounding_box = np.array([length / 2, width / 2, height / 2])
+        else:
+            obj2_half_bounding_box = obj2.get_bounding_box_half_size()
+            length, width, height = obj2_half_bounding_box[0] * 2, obj2_half_bounding_box[1] * 2, obj2_half_bounding_box[2] * 2
+        
+        # find the min and max of obj1's bounding box in the local frame of obj2
+        obj1_bounding_box_in_obj2_frame = self.local_frame_bounding_box(obj2_pos, obj2_quat, obj1_pos, obj1_half_bounding_box, obj1_quat)
+        # find the min and max of obj2's bounding box
+        obj2_bounding_box = (-obj2_half_bounding_box[0], +obj2_half_bounding_box[0], -obj2_half_bounding_box[1], +obj2_half_bounding_box[1], -obj2_half_bounding_box[2], +obj2_half_bounding_box[2])
+        # calculate the overlap percentage. The bounding boxes are in the local frame of obj2
+        overlap_x = max(0, min(obj1_bounding_box_in_obj2_frame[1], obj2_bounding_box[1]) - max(obj1_bounding_box_in_obj2_frame[0], obj2_bounding_box[0]))
+        overlap_y = max(0, min(obj1_bounding_box_in_obj2_frame[3], obj2_bounding_box[3]) - max(obj1_bounding_box_in_obj2_frame[2], obj2_bounding_box[2]))
+        overlap_z = max(0, min(obj1_bounding_box_in_obj2_frame[5], obj2_bounding_box[5]) - max(obj1_bounding_box_in_obj2_frame[4], obj2_bounding_box[4]))
+        overlap_volume = overlap_x * overlap_y * overlap_z
+        obj1_volume = length * width * height
+        return overlap_volume / obj1_volume
+
+    
+    def local_frame_bounding_box(self, local_center, local_quat, obj_center_pos, obj_half_bounding_box, obj_quat):
+        """Calculate the bounding box of an object in a local frame.
+
+        Args:
+            local_center (array): position of the local frame's center in the global frame
+            local_quat (array): quaternion of the local frame
+            obj_center_pos (array): position of the object's center in the global frame
+            obj_half_bounding_box (array): half bounding box size of the object
+            obj_quat (array): object's quaternion
+        Returns:
+            bounding_box_local (array): (min_x, max_x, min_y, max_y, min_z, max_z) of the bounding box in the local frame
+        """
+        # Calculate eight corners of the bounding box in the object's frame
+        corners = np.array([
+            [-1, -1, -1],
+            [1, -1, -1],
+            [-1, 1, -1],
+            [1, 1, -1],
+            [-1, -1, 1],
+            [1, -1, 1],
+            [-1, 1, 1],
+            [1, 1, 1]
+        ])
+        corners = corners * obj_half_bounding_box + obj_center_pos
+        # Calculate the eight corners in the local frame
+        corners_local = np.zeros_like(corners)
+        for i, corner in enumerate(corners):
+            corners_local[i] = self.local_frame_pos(local_center, local_quat, obj_center_pos, corner, obj_quat)
+        # find the min and max of the corners in the local frame
+        min_x = np.min(corners_local[:, 0])
+        max_x = np.max(corners_local[:, 0])
+        min_y = np.min(corners_local[:, 1])
+        max_y = np.max(corners_local[:, 1])
+        min_z = np.min(corners_local[:, 2])
+        max_z = np.max(corners_local[:, 2])
+
+        bounding_box_local = np.array([min_x, max_x, min_y, max_y, min_z, max_z])
+        return bounding_box_local
+    
+    def local_frame_pos(self, local_center, local_quat, obj_center_pos, point_pos, quat):
+        """Calculate the position of an point's position in a local frame.
+
+        Args:
+            local_center (array): position of the local frame's center in the global frame
+            local_quat (array): quaternion of the local frame
+            obj_center_pos (array): position of the object's center in the global frame
+            point_pos (array): position of the point in the object's frame
+            quat (array): object's quaternion
+        Returns:
+            pos_local (array): position of the point in the local frame
+        """
+        # Calculate the rotation matrix of the local frame
+        local_rot = T.quat2mat(local_quat)
+
+        # Calculate the rotation matrix of the object
+        obj_rot = T.quat2mat(quat)
+
+        # Calculate the point's position in the global frame
+        pos_global = obj_rot.dot(point_pos) + obj_center_pos
+
+        # Calculate the point's position in the local frame
+        pos_local = local_rot.T.dot(pos_global - local_center)
+
+        return pos_local
+        
 
 # region MugCleanup_D1
 class MugCleanup_D1(MugCleanup_D0):
