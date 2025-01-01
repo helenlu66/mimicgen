@@ -706,7 +706,7 @@ class MugCleanup(SingleArmEnv_MG):
             return True
         else: 
             percent_overlap = self.estimate_obj1_overlap_w_obj2(obj_name, "drawer")
-            return percent_overlap > 0.75 # obj is considered in the drawer if 75% of it is inside the drawer
+            return percent_overlap > 0.5 # obj is considered in the drawer if 50% of it is inside the drawer
 
             
     def check_in_mug(self, obj_name):
@@ -733,7 +733,7 @@ class MugCleanup(SingleArmEnv_MG):
         # optional contact based method that I don't think works as well.
         # return self.check_contact(self.mug, self.cube)
         percent_overlap = self.estimate_obj1_overlap_w_obj2(obj_name, "mug")
-        return percent_overlap > 0.75 # obj is considered in the mug if 75% of it is inside the mug
+        return percent_overlap > 0.5 # obj is considered in the mug if 50% of it is inside the mug
     
     def check_drawer_open(self):
         """
