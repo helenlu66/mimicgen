@@ -18,6 +18,7 @@ from robosuite.utils.placement_samplers import SequentialCompositeSampler, Unifo
 from robosuite.utils.observables import Observable, sensor
 
 import mimicgen
+import xml.etree.ElementTree as ET
 from mimicgen.models.robosuite.objects import BlenderObject, CoffeeMachinePodObject, CoffeeMachineObject, LongDrawerObject, CupObject
 from mimicgen.envs.robosuite.single_arm_env_mg import SingleArmEnv_MG
 
@@ -265,6 +266,8 @@ class Coffee_Pre_Novelty(SingleArmEnv_MG):
         # initialize objects of interest
         self.coffee_pod = CoffeeMachinePodObject(name="coffee_pod")
         self.coffee_machine = CoffeeMachineObject(name="coffee_machine")
+        self.coffee_machine_lid = self.coffee_machine.lid
+        self.coffee_pod_holder = self.coffee_machine.pod_holder
         
         objects = [self.coffee_pod, self.coffee_machine]
 
@@ -618,22 +621,26 @@ class Coffee_Pre_Novelty(SingleArmEnv_MG):
         """
         Returns True if the object is directly on the table.
         """
-        if obj_name == 'coffee-pod':
-            obj_name = 'coffee_pod'
-        if hasattr(self, obj_name):
-            obj_bounding_box = getattr(self, obj_name).get_bounding_box_half_size()
-        elif obj_name == 'coffee-machine-lid':
-            obj_name = 'coffee_machine_lid'
-            obj_bounding_box = self.coffee_machine.lid_size
-        elif obj_name == 'coffee-pod-holder':
-            obj_name = 'coffee_pod_holder'
-            obj_bounding_box = self.pod_holder_size
-        elif obj_name == 'drawer':
-            obj_bounding_box = self.cabinet_object.get_bounding_box_half_size()
-        table_z_offset = self.table_offset[2]
-        obj_z = self.sim.data.body_xpos[self.obj_body_id[obj_name]][2]
-        obj_bottom_z = obj_z - obj_bounding_box[2]
-        return obj_bottom_z - table_z_offset < 0.01
+        # if obj_name == 'coffee-pod':
+        #     obj_name = 'coffee_pod'
+        # if hasattr(self, obj_name):
+        #     obj_bounding_box = getattr(self, obj_name).get_bounding_box_half_size()
+        # elif obj_name == 'coffee-machine-lid':
+        #     obj_name = 'coffee_machine_lid'
+        #     obj_bounding_box = self.coffee_machine.lid_size
+        # elif obj_name == 'coffee-pod-holder':
+        #     obj_name = 'coffee_pod_holder'
+        #     obj_bounding_box = self.pod_holder_size
+        # elif obj_name == 'drawer':
+        #     obj_bounding_box = self.cabinet_object.get_bounding_box_half_size()
+        # table_z_offset = self.table_offset[2]
+        # obj_z = self.sim.data.body_xpos[self.obj_body_id[obj_name]][2]
+        # obj_bottom_z = obj_z - obj_bounding_box[2]
+        # return obj_bottom_z - table_z_offset < 0.01
+        obj_name = obj_name.replace('-', '_')
+        obj = getattr(self, obj_name)
+        return self.check_contact(obj, 'table_collision')
+        
     
 
     def check_pod(self):
@@ -969,13 +976,13 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
             tex_attrib={"type": "cube"},
             mat_attrib={"texrepeat": "3 3", "specular": "0.4","shininess": "0.1"}
         )
-        self.cabinet_object = LongDrawerObject(name="CabinetObject")
+        self.drawer = LongDrawerObject(name="DrawerObject")
 
         # # old: manually set position in xml and add to mujoco arena
         # cabinet_object = self.cabinet_object.get_obj()
         # cabinet_object.set("pos", array_to_string((0.2, 0.30, 0.03)))
         # mujoco_arena.table_body.append(cabinet_object)
-        obj_body = self.cabinet_object
+        obj_body = self.drawer
         for material in [redwood, ceramic, lightwood]:
             tex_element, mat_element, _, used = add_material(root=obj_body.worldbody,
                                                              naming_prefix=obj_body.naming_prefix,
@@ -989,8 +996,10 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         # Create coffee pod and machine (note that machine no longer has a cup!)
         self.coffee_pod = CoffeeMachinePodObject(name="coffee_pod")
         self.coffee_machine = CoffeeMachineObject(name="coffee_machine", add_cup=False)
+        self.coffee_pod_holder = self.coffee_machine.pod_holder
+        self.coffee_machine_lid = self.coffee_machine.lid
         # objects = [self.coffee_pod, self.coffee_machine, self.cabinet_object, self.mug]
-        objects = [self.coffee_pod, self.coffee_machine, self.cabinet_object]
+        objects = [self.coffee_pod, self.coffee_machine, self.drawer]
 
         # Create placement initializer
         self._get_placement_initializer()
@@ -1063,7 +1072,7 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         self.placement_initializer.append_sampler(
             sampler=UniformRandomSampler(
                 name="DrawerSampler",
-                mujoco_objects=self.cabinet_object,
+                mujoco_objects=self.drawer,
                 x_range=bounds["drawer"]["x"],
                 y_range=bounds["drawer"]["y"],
                 rotation=bounds["drawer"]["z_rot"],
@@ -1130,10 +1139,10 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         """
         super()._setup_references()
 
-        self.cabinet_qpos_addr = self.sim.model.get_joint_qpos_addr(self.cabinet_object.joints[0])
-        self.obj_body_id["drawer"] = self.sim.model.body_name2id(self.cabinet_object.root_body)
+        self.cabinet_qpos_addr = self.sim.model.get_joint_qpos_addr(self.drawer.joints[0])
+        self.obj_body_id["drawer"] = self.sim.model.body_name2id(self.drawer.root_body)
         self.obj_body_id["mug"] = self.sim.model.body_name2id(self.mug.root_body)
-        self.drawer_bottom_geom_id = self.sim.model.geom_name2id("CabinetObject_drawer_bottom")
+        self.drawer_bottom_geom_id = self.sim.model.geom_name2id("DrawerObject_drawer_bottom")
 
     def _reset_internal(self):
         """
@@ -1149,7 +1158,7 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
 
             # Loop through all objects and reset their positions
             for obj_pos, obj_quat, obj in object_placements.values():
-                if obj is self.cabinet_object:
+                if obj is self.drawer:
                     # object is fixture - set pose in model
                     body_id = self.sim.model.body_name2id(obj.root_body)
                     obj_pos_to_set = np.array(obj_pos)
@@ -1186,7 +1195,7 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
 
             # our x-y relative position is sampled with respect to drawer geom frame. Here, we use the drawer's rotation
             # matrix to convert this relative position to a world relative position, so we can add it to the drawer world position
-            drawer_rot_mat = T.quat2mat(T.convert_quat(self.sim.model.body_quat[self.sim.model.body_name2id(self.cabinet_object.root_body)], to="xyzw"))
+            drawer_rot_mat = T.quat2mat(T.convert_quat(self.sim.model.body_quat[self.sim.model.body_name2id(self.drawer.root_body)], to="xyzw"))
             rel_pod_pos[:2] = drawer_rot_mat[:2, :2].dot(rel_pod_pos[:2])
 
             # also convert the sampled pod rotation to world frame
@@ -1289,14 +1298,14 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
             # add drawer's max travel distance observable
             @sensor(modality=modality)
             def drawer1_cabinet_side_length(obs_cache):
-                return self.cabinet_object.drawer_side_wall_size[1]
+                return self.drawer.drawer_side_wall_size[1]
             sensors += [drawer1_cabinet_side_length]
             names += ["drawer1_cabinet_side_length"]
     
 
             @sensor(modality=modality)
             def drawer1_travel_distance(obs_cache):
-                return drawer_opening_percentage * self.cabinet_object.max_drawer_travel_distance
+                return drawer_opening_percentage * self.drawer.max_drawer_travel_distance
             sensors += [drawer1_travel_distance]
             names += ["drawer1_travel_distance"]
 
@@ -1315,36 +1324,6 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
 
         return observables
     
-    def _calculate_boxes_overlap_percentage(self, obj1_pos, obj1_half_bounding_box, obj2_pos, obj2_half_bounding_box):
-        """calculate the percentage of obj1's bounding box that overlaps with obj2's bounding box
-
-        Args:
-            obj1_pos (np.array): position of obj1
-            obj1_half_bounding_box (np.array): half bounding box size of obj1
-            obj2_pos (np.array): position of obj2
-            obj2_half_bounding_box (np.array): half bounding box size of obj2
-        """
-        x1, y1, z1 = obj1_pos
-        hx1, hy1, hz1 = obj1_half_bounding_box
-        x2, y2, z2 = obj2_pos
-        hx2, hy2, hz2 = obj2_half_bounding_box
-
-        # calculate the min and max coordinates of the bounding boxes
-        min1 = [x1 - hx1, y1 - hy1, z1 - hz1]
-        max1 = [x1 + hx1, y1 + hy1, z1 + hz1]
-        min2 = [x2 - hx2, y2 - hy2, z2 - hz2]
-        max2 = [x2 + hx2, y2 + hy2, z2 + hz2]
-
-        # calculate the overlap along each axis
-        overlap = [max(0, min1[i] - max2[i], max1[i] - min2[i]) for i in range(3)]
-        # calculate the volume of the overlap
-        overlap_volume = overlap[0] * overlap[1] * overlap[2]
-        # calculate the volume of obj1
-        obj1_volume = (2 * hx1) * (2 * hy1) * (2 * hz1)
-        # calculate the percentage of obj1's volume that overlaps with obj2
-        overlap_percentage = overlap_volume / obj1_volume
-        return overlap_percentage
-    
     def _create_overlap_sensors(self):
         """
         Create sensors for the overlap between objects.
@@ -1353,101 +1332,85 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         names = []
 
         modality = "object"
-        drawer1_id = self.sim.model.body_name2id(self.cabinet_object.root_body)
-        drawer1_pos = self.sim.data.body_xpos[drawer1_id]
-        drawer1_half_bounding_box = self.cabinet_object.get_bounding_box_half_size()
-        drawer1_half_bounding_box[1] = self.cabinet_object.horizontal_radius # use the horizontal radius for the y-axis since for some reason the half bounding box's y is 0
-        mug1_id = self.sim.model.body_name2id(self.mug.root_body)
-        mug1_pos = self.sim.data.body_xpos[mug1_id]
-        mug1_half_bounding_box = self.mug.get_bounding_box_half_size()
-        coffee_pod_id = self.sim.model.body_name2id(self.coffee_pod.root_body)
-        coffee_pod_pos = self.sim.data.body_xpos[coffee_pod_id]
-        coffee_pod_half_bounding_box = self.coffee_pod.get_bounding_box_half_size()
-        coffe_machine_lid_id = self.sim.model.body_name2id(self.coffee_machine.name + '_' + self.coffee_machine.lid.root_body)
-        coffee_machine_lid_pos = self.sim.data.body_xpos[coffe_machine_lid_id]
-        coffee_machine_lid_half_bounding_box = self.coffee_machine.lid.get_bounding_box_half_size()
-        coffee_pod_holder_id = self.sim.model.body_name2id(self.coffee_machine.name + '_' + self.coffee_machine.pod_holder.root_body)
-        coffee_pod_holder_pos = self.sim.data.body_xpos[coffee_pod_holder_id]
-        coffee_pod_holder_half_bounding_box = self.coffee_machine.pod_holder.get_bounding_box_half_size()
 
         # mug1 overlaps
-        mug1_drawer1_overlap = self._calculate_boxes_overlap_percentage(mug1_pos, mug1_half_bounding_box, drawer1_pos, drawer1_half_bounding_box)
-        mug1_coffee_pod_holder1_overlap = self._calculate_boxes_overlap_percentage(mug1_pos, mug1_half_bounding_box, coffee_pod_holder_pos, coffee_pod_holder_half_bounding_box)
+        mug1_drawer1_overlap = self.estimate_obj1_overlap_w_obj2("mug", "drawer")
+        mug1_coffee_pod_holder1_overlap = self.estimate_obj1_overlap_w_obj2("mug", "coffee_pod_holder")
 
         # coffee pod overlaps
-        coffee_pod1_drawer1_overlap = self._calculate_boxes_overlap_percentage(coffee_pod_pos, coffee_pod_half_bounding_box, drawer1_pos, drawer1_half_bounding_box)
-        coffee_pod1_mug1_overlap = self._calculate_boxes_overlap_percentage(coffee_pod_pos, coffee_pod_half_bounding_box, mug1_pos, mug1_half_bounding_box)
-        coffee_pod1_coffee_pod_holder1_overlap = self._calculate_boxes_overlap_percentage(coffee_pod_pos, coffee_pod_half_bounding_box, coffee_pod_holder_pos, coffee_pod_holder_half_bounding_box)
+        coffee_pod1_drawer1_overlap = self.estimate_obj1_overlap_w_obj2("coffee_pod", "drawer")
+        coffee_pod1_mug1_overlap = self.estimate_obj1_overlap_w_obj2("coffee_pod", "mug")
+        coffee_pod1_coffee_pod_holder1_overlap = self.estimate_obj1_overlap_w_obj2("coffee_pod", "coffee_pod_holder")
 
         # coffee machine lid overlaps
-        coffee_machine_lid1_drawer1_overlap = self._calculate_boxes_overlap_percentage(coffee_machine_lid_pos, coffee_machine_lid_half_bounding_box, drawer1_pos, drawer1_half_bounding_box)
-        coffee_machine_lid1_mug1_overlap = self._calculate_boxes_overlap_percentage(coffee_machine_lid_pos, coffee_machine_lid_half_bounding_box, mug1_pos, mug1_half_bounding_box)
-        coffee_machine_lid1_coffee_pod_holder1_overlap = self._calculate_boxes_overlap_percentage(coffee_machine_lid_pos, coffee_machine_lid_half_bounding_box, coffee_pod_holder_pos, coffee_pod_holder_half_bounding_box)
+        coffee_machine_lid1_drawer1_overlap = self.estimate_obj1_overlap_w_obj2("coffee_machine_lid", "drawer")
+        coffee_machine_lid1_mug1_overlap = self.estimate_obj1_overlap_w_obj2("coffee_machine_lid", "mug")
+        coffee_machine_lid1_coffee_pod_holder1_overlap = self.estimate_obj1_overlap_w_obj2("coffee_machine_lid", "coffee_pod_holder")
 
         # coffee pod holder overlaps
-        coffee_pod_holder1_drawer1_overlap = self._calculate_boxes_overlap_percentage(coffee_pod_holder_pos, coffee_pod_holder_half_bounding_box, drawer1_pos, drawer1_half_bounding_box)
-        coffee_pod_holder1_mug1_overlap = self._calculate_boxes_overlap_percentage(coffee_pod_holder_pos, coffee_pod_holder_half_bounding_box, mug1_pos, mug1_half_bounding_box)
+        coffee_pod_holder1_drawer1_overlap = self.estimate_obj1_overlap_w_obj2("coffee_pod_holder", "drawer")
+        coffee_pod_holder1_mug1_overlap = self.estimate_obj1_overlap_w_obj2("coffee_pod_holder", "mug")
 
         # add sensors
         @sensor(modality=modality)
-        def percent_overlap_of_mug1_bounding_box_with_drawer1_bounding_box(obs_cache):
+        def percent_overlap_of_mug1_with_drawer1(obs_cache):
             return np.array([mug1_drawer1_overlap])
-        sensors += [percent_overlap_of_mug1_bounding_box_with_drawer1_bounding_box]
-        names += ["percent_overlap_of_mug1_bounding_box_with_drawer1_bounding_box"]
+        sensors += [percent_overlap_of_mug1_with_drawer1]
+        names += ["percent_overlap_of_mug1_with_drawer1"]
 
         @sensor(modality=modality)
-        def percent_overlap_of_mug1_bounding_box_with_coffee_pod_holder1_bounding_box(obs_cache):
+        def percent_overlap_of_mug1_with_coffee_pod_holder1(obs_cache):
             return np.array([mug1_coffee_pod_holder1_overlap])
-        sensors += [percent_overlap_of_mug1_bounding_box_with_coffee_pod_holder1_bounding_box]
-        names += ["percent_overlap_of_mug1_bounding_box_with_coffee-pod-holder1_bounding_box"]
+        sensors += [percent_overlap_of_mug1_with_coffee_pod_holder1]
+        names += ["percent_overlap_of_mug1_with_coffee_pod_holder1"]
 
         @sensor(modality=modality)
-        def percent_overlap_of_coffee_pod1_bounding_box_with_drawer1_bounding_box(obs_cache):
+        def percent_overlap_of_coffee_pod1_with_drawer1(obs_cache):
             return np.array([coffee_pod1_drawer1_overlap])
-        sensors += [percent_overlap_of_coffee_pod1_bounding_box_with_drawer1_bounding_box]
-        names += ["percent_overlap_of_coffee-pod1_bounding_box_with_drawer1_bounding_box"]
+        sensors += [percent_overlap_of_coffee_pod1_with_drawer1]
+        names += ["percent_overlap_of_coffee_pod1_with_drawer1"]
 
         @sensor(modality=modality)
-        def percent_overlap_of_coffee_pod1_bounding_box_with_mug1_bounding_box(obs_cache):
+        def percent_overlap_of_coffee_pod1_with_mug1(obs_cache):
             return np.array([coffee_pod1_mug1_overlap])
-        sensors += [percent_overlap_of_coffee_pod1_bounding_box_with_mug1_bounding_box]
-        names += ["percent_overlap_of_coffee-pod1_bounding_box_with_mug1_bounding_box"]
+        sensors += [percent_overlap_of_coffee_pod1_with_mug1]
+        names += ["percent_overlap_of_coffee_pod1_with_mug1"]
 
         @sensor(modality=modality)
-        def percent_overlap_of_coffee_pod1_bounding_box_with_coffee_pod_holder1_bounding_box(obs_cache):
+        def percent_overlap_of_coffee_pod1_with_coffee_pod_holder1(obs_cache):
             return np.array([coffee_pod1_coffee_pod_holder1_overlap])
-        sensors += [percent_overlap_of_coffee_pod1_bounding_box_with_coffee_pod_holder1_bounding_box]
-        names += ["percent_overlap_of_coffee-pod1_bounding_box_with_coffee-pod-holder1_bounding_box"]
+        sensors += [percent_overlap_of_coffee_pod1_with_coffee_pod_holder1]
+        names += ["percent_overlap_of_coffee_pod1_with_coffee_pod_holder1"]
 
         @sensor(modality=modality)
-        def percent_overlap_of_coffee_machine_lid1_bounding_box_with_drawer1_bounding_box(obs_cache):
+        def percent_overlap_of_coffee_machine_lid1_with_drawer1(obs_cache):
             return np.array([coffee_machine_lid1_drawer1_overlap])
-        sensors += [percent_overlap_of_coffee_machine_lid1_bounding_box_with_drawer1_bounding_box]
-        names += ["percent_overlap_of_lid1_bounding_box_with_drawer1_bounding_box"]
+        sensors += [percent_overlap_of_coffee_machine_lid1_with_drawer1]
+        names += ["percent_overlap_of_coffee_machine_lid1_with_drawer1"]
 
         @sensor(modality=modality)
-        def percent_overlap_of_coffee_machine_lid1_bounding_box_with_mug1_bounding_box(obs_cache):
+        def percent_overlap_of_coffee_machine_lid1_with_mug1(obs_cache):
             return np.array([coffee_machine_lid1_mug1_overlap])
-        sensors += [percent_overlap_of_coffee_machine_lid1_bounding_box_with_mug1_bounding_box]
-        names += ["percent_overlap_of_lid1_bounding_box_with_mug1_bounding_box"]
+        sensors += [percent_overlap_of_coffee_machine_lid1_with_mug1]
+        names += ["percent_overlap_of_coffee_machine_lid1_with_mug1"]
 
         @sensor(modality=modality)
-        def percent_overlap_of_coffee_machine_lid1_bounding_box_with_coffee_pod_holder1_bounding_box(obs_cache):
+        def percent_overlap_of_coffee_machine_lid1_with_coffee_pod_holder1(obs_cache):
             return np.array([coffee_machine_lid1_coffee_pod_holder1_overlap])
-        sensors += [percent_overlap_of_coffee_machine_lid1_bounding_box_with_coffee_pod_holder1_bounding_box]
-        names += ["percent_overlap_of_lid1_bounding_box_with_coffee-pod-holder1_bounding_box"]
+        sensors += [percent_overlap_of_coffee_machine_lid1_with_coffee_pod_holder1]
+        names += ["percent_overlap_of_coffee_machine_lid1_with_coffee_pod_holder1"]
 
         @sensor(modality=modality)
-        def percent_overlap_of_coffee_pod_holder1_bounding_box_with_drawer1_bounding_box(obs_cache):
+        def percent_overlap_of_coffee_pod_holder1_with_drawer1(obs_cache):
             return np.array([coffee_pod_holder1_drawer1_overlap])
-        sensors += [percent_overlap_of_coffee_pod_holder1_bounding_box_with_drawer1_bounding_box]
-        names += ["percent_overlap_of_coffee-pod-holder1_bounding_box_with_drawer1_bounding_box"]
+        sensors += [percent_overlap_of_coffee_pod_holder1_with_drawer1]
+        names += ["percent_overlap_of_coffee_pod_holder1_with_drawer1"]
 
         @sensor(modality=modality)
-        def percent_overlap_of_coffee_pod_holder1_bounding_box_with_mug1_bounding_box(obs_cache):
+        def percent_overlap_of_coffee_pod_holder1_with_mug1(obs_cache):
             return np.array([coffee_pod_holder1_mug1_overlap])
-        sensors += [percent_overlap_of_coffee_pod_holder1_bounding_box_with_mug1_bounding_box]
-        names += ["percent_overlap_of_coffee-pod-holder1_bounding_box_with_mug1_bounding_box"]
+        sensors += [percent_overlap_of_coffee_pod_holder1_with_mug1]
+        names += ["percent_overlap_of_coffee_pod_holder1_with_mug1"]
 
         return sensors, names
 
@@ -1456,15 +1419,19 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         Returns true if object is in the mug.
         """
         obj_name = obj_name.replace('-', '_')
+        if obj_name != 'coffee_pod':
+            return False # only coffee pod can be in the mug
         # get mug's half bounding box and pos
-        mug_half_bounding_box = self.mug.get_bounding_box_half_size()
-        mug_pos = self.sim.data.body_xpos[self.obj_body_id["mug"]]
-        # get object's bounding box and pos
-        obj_half_bounding_box = getattr(self, obj_name).get_bounding_box_half_size()
-        obj_pos = self.sim.data.body_xpos[self.obj_body_id[obj_name]]
-        # check if object is in mug
-        in_mug = np.all(np.abs(mug_pos - obj_pos) <= mug_half_bounding_box - obj_half_bounding_box)
-        return in_mug
+        # mug_half_bounding_box = self.mug.get_bounding_box_half_size()
+        # mug_pos = self.sim.data.body_xpos[self.obj_body_id["mug"]]
+        # # get object's bounding box and pos
+        # obj_half_bounding_box = getattr(self, obj_name).get_bounding_box_half_size()
+        # obj_pos = self.sim.data.body_xpos[self.obj_body_id[obj_name]]
+        # # check if object is in mug
+        # in_mug = np.all(np.abs(mug_pos - obj_pos) <= mug_half_bounding_box - obj_half_bounding_box)
+        # return in_mug
+        percent_overlap = self.estimate_obj1_overlap_w_obj2(obj_name, "mug")
+        return percent_overlap > 0.5 # obj is considered in the mug if 50% of it is inside the mug
     
     def check_in_drawer(self, obj_name):
         """
@@ -1473,9 +1440,13 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         # check if object is in contact with the inside of the drawer
         assert obj_name in ["mug", "coffee-pod"]
         obj_name = obj_name.replace('-', '_')
-        drawer_bottom_geom = "CabinetObject_drawer_bottom"
-        obj_in_drawer = self.check_contact(drawer_bottom_geom, getattr(self, obj_name))
-        return obj_in_drawer
+        drawer_bottom_geom = "DrawerObject_drawer_bottom"
+        contact = self.check_contact(drawer_bottom_geom, getattr(self, obj_name))
+        if contact:
+            return True
+        else:
+            percent_overlap = self.estimate_obj1_overlap_w_obj2(obj_name, "drawer")
+            return percent_overlap > 0.5 # obj is considered in the drawer if 50% of it is inside the drawer 
 
     
     def check_drawer_open(self):
@@ -1531,6 +1502,196 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         mug_on_machine = self.check_mug_under_pod_holder()
 
         return mug_upright and mug_on_machine
+    
+    def estimate_obj1_overlap_w_obj2(self, obj1_name, obj2_name):
+        """Estimate the percent overlap between two objects' bounding boxes. For example, if obj1 is fully inside obj2, the percentage is 1.
+
+        Args:
+            obj1_name (str): name of the first object
+            obj2_name (str): name of the second object
+        Returns:
+            float: percentage of obj1's bounding box that overlaps with obj2's bounding box in [0, 1]
+        """
+        obj1 = getattr(self, obj1_name)
+        if obj1_name in ('coffee_pod_holder', 'coffee_machine_lid'):
+            obj1_id = self.sim.model.body_name2id("coffee_machine_" + obj1.root_body)
+        else:
+            obj1_id = self.sim.model.body_name2id(obj1.root_body)
+        obj1_pos = self.sim.data.body_xpos[obj1_id]
+        obj1_quat = self.sim.data.body_xquat[obj1_id]
+        if obj1_name == "drawer":
+            XML_ASSETS_BASE_PATH = os.path.join(mimicgen.__path__[0], "models/robosuite/assets")
+            xml_path = os.path.join(XML_ASSETS_BASE_PATH, "objects/drawer_long.xml")
+            body_name = "drawer_link"  
+            # Get bounding box dimensions
+            length, width, height = self.get_bounding_box_dimensions(xml_path, body_name)
+            obj1_half_bounding_box = np.array([length / 2, width / 2, height / 2])
+        else:
+            obj1_half_bounding_box = obj1.get_bounding_box_half_size()
+
+        obj2 = getattr(self, obj2_name)
+        if obj2_name in ('coffee_pod_holder', 'coffee_machine_lid'):
+            obj2_id = self.sim.model.body_name2id("coffee_machine_" + obj2.root_body)
+        else:
+            obj2_id = self.sim.model.body_name2id(obj2.root_body)
+        obj2_pos = self.sim.data.body_xpos[obj2_id]
+        obj2_quat = self.sim.data.body_xquat[obj2_id]
+        if obj2_name == "drawer":
+            XML_ASSETS_BASE_PATH = os.path.join(mimicgen.__path__[0], "models/robosuite/assets")
+            xml_path = os.path.join(XML_ASSETS_BASE_PATH, "objects/drawer_long.xml")
+            body_name = "drawer_link"  
+            # Get bounding box dimensions
+            length, width, height = self.get_bounding_box_dimensions(xml_path, body_name)
+            obj2_half_bounding_box = np.array([length / 2, width / 2, height / 2])
+        else:
+            obj2_half_bounding_box = obj2.get_bounding_box_half_size()
+    
+        
+        # find the min and max of obj1's bounding box in the local frame of obj2
+        obj1_bounding_box_in_obj2_frame = self.local_frame_bounding_box(obj2_pos, obj2_quat, obj1_pos, obj1_half_bounding_box, obj1_quat)
+        # find the min and max of obj2's bounding box
+        obj2_bounding_box = (-obj2_half_bounding_box[0], +obj2_half_bounding_box[0], -obj2_half_bounding_box[1], +obj2_half_bounding_box[1], -obj2_half_bounding_box[2], +obj2_half_bounding_box[2])
+        # calculate the overlap percentage. The bounding boxes are in the local frame of obj2
+        overlap_x = max(0, min(obj1_bounding_box_in_obj2_frame[1], obj2_bounding_box[1]) - max(obj1_bounding_box_in_obj2_frame[0], obj2_bounding_box[0]))
+        overlap_y = max(0, min(obj1_bounding_box_in_obj2_frame[3], obj2_bounding_box[3]) - max(obj1_bounding_box_in_obj2_frame[2], obj2_bounding_box[2]))
+        overlap_z = max(0, min(obj1_bounding_box_in_obj2_frame[5], obj2_bounding_box[5]) - max(obj1_bounding_box_in_obj2_frame[4], obj2_bounding_box[4]))
+        overlap_volume = overlap_x * overlap_y * overlap_z
+        obj1_volume = (obj1_bounding_box_in_obj2_frame[1] - obj1_bounding_box_in_obj2_frame[0]) * (obj1_bounding_box_in_obj2_frame[3] - obj1_bounding_box_in_obj2_frame[2]) * (obj1_bounding_box_in_obj2_frame[5] - obj1_bounding_box_in_obj2_frame[4])
+        return overlap_volume / obj1_volume
+    
+    def get_bounding_box_dimensions(self, xml_path: str, body_name: str):
+        """
+        Computes the bounding box dimensions (length, width, height) for a specific body in a Mujoco XML.
+        
+        Args:
+        - xml_path (str): Path to the Mujoco XML file.
+        - body_name (str): Name of the body whose bounding box dimensions are to be calculated.
+
+        Returns:
+        - tuple: A tuple containing (length, width, height)
+        """
+        # Parse the XML file
+        tree = ET.parse(xml_path)
+        root = tree.getroot()
+
+        # Find all geoms in the specified body
+        geoms = root.findall(f".//body[@name='{body_name}']//geom")
+
+        # Initialize bounding box extents
+        min_x, max_x = float('inf'), float('-inf')
+        min_y, max_y = float('inf'), float('-inf')
+        min_z, max_z = float('inf'), float('-inf')
+
+        # Compute bounding box for each geom
+        for geom in geoms:
+            pos = list(map(float, geom.get('pos').split()))  # [x, y, z]
+            size = list(map(float, geom.get('size').split()))
+            geom_type = geom.get('type', 'box')  # Default to 'box' if type is not specified
+
+            if geom_type == 'box':
+                # Box has 3 size elements: [x, y, z]
+                dx, dy, dz = size[0], size[1], size[2]
+            elif geom_type in ['capsule', 'cylinder']:
+                # Capsule/Cylinder have 2 size elements: [radius, half-length]
+                dx = size[1]  # length of the capsule/cylinder
+                dy = dz = size[0]  # radius determines the y and z size
+            elif geom_type == 'sphere':
+                # Sphere has 1 size element: [radius]
+                dx = dy = dz = size[0]
+            elif geom_type == 'plane':
+                # Plane has 2 size elements: [x, y] (z is typically flat)
+                dx = size[0]
+                dy = size[1]
+                dz = 0  # Planes don't have height (they're flat)
+            else:
+                # If the type is unknown, assume it is a box with default size
+                dx = dy = dz = 0
+
+            # Handle cases where the position may not have all 3 components
+            px = pos[0] if len(pos) > 0 else 0
+            py = pos[1] if len(pos) > 1 else 0
+            pz = pos[2] if len(pos) > 2 else 0
+
+            min_x = min(min_x, px - dx)
+            max_x = max(max_x, px + dx)
+
+            min_y = min(min_y, py - dy)
+            max_y = max(max_y, py + dy)
+
+            min_z = min(min_z, pz - dz)
+            max_z = max(max_z, pz + dz)
+
+        # Calculate dimensions
+        length = max_x - min_x  # Extent along x-axis
+        width = max_y - min_y   # Extent along y-axis
+        height = max_z - min_z  # Extent along z-axis
+
+        return length, width, height
+    
+    def local_frame_bounding_box(self, local_center, local_quat, obj_center_pos, obj_half_bounding_box, obj_quat):
+        """Calculate the bounding box of an object in a local frame.
+
+        Args:
+            local_center (array): position of the local frame's center in the global frame
+            local_quat (array): quaternion of the local frame
+            obj_center_pos (array): position of the object's center in the global frame
+            obj_half_bounding_box (array): half bounding box size of the object
+            obj_quat (array): object's quaternion
+        Returns:
+            bounding_box_local (array): (min_x, max_x, min_y, max_y, min_z, max_z) of the bounding box in the local frame
+        """
+        # Calculate eight corners of the bounding box in the object's frame
+        corners = np.array([
+            [-1, -1, -1],
+            [1, -1, -1],
+            [-1, 1, -1],
+            [1, 1, -1],
+            [-1, -1, 1],
+            [1, -1, 1],
+            [-1, 1, 1],
+            [1, 1, 1]
+        ])
+        corners = corners * obj_half_bounding_box
+        # Calculate the eight corners in the local frame
+        corners_local = np.zeros_like(corners)
+        for i, corner in enumerate(corners):
+            corners_local[i] = self.local_frame_pos(local_center, local_quat, obj_center_pos, corner, obj_quat)
+        # find the min and max of the corners in the local frame
+        min_x = np.min(corners_local[:, 0])
+        max_x = np.max(corners_local[:, 0])
+        min_y = np.min(corners_local[:, 1])
+        max_y = np.max(corners_local[:, 1])
+        min_z = np.min(corners_local[:, 2])
+        max_z = np.max(corners_local[:, 2])
+
+        bounding_box_local = np.array([min_x, max_x, min_y, max_y, min_z, max_z])
+        return bounding_box_local
+    
+    def local_frame_pos(self, local_center, local_quat, obj_center_pos, point_pos, quat):
+        """Calculate the position of an point's position in a local frame.
+
+        Args:
+            local_center (array): position of the local frame's center in the global frame
+            local_quat (array): quaternion of the local frame
+            obj_center_pos (array): position of the object's center in the global frame
+            point_pos (array): position of the point in the object's frame
+            quat (array): object's quaternion
+        Returns:
+            pos_local (array): position of the point in the local frame
+        """
+        # Calculate the rotation matrix of the local frame
+        local_rot = T.quat2mat(local_quat)
+
+        # Calculate the rotation matrix of the object
+        obj_rot = T.quat2mat(quat)
+
+        # Calculate the point's position in the global frame
+        pos_global = obj_rot.dot(point_pos) + obj_center_pos
+
+        # Calculate the point's position in the local frame
+        pos_local = local_rot.T.dot(pos_global - local_center)
+
+        return pos_local
 
     def _get_partial_task_metrics(self):
         """
