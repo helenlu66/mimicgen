@@ -361,8 +361,8 @@ class MugCleanup(SingleArmEnv_MG):
         # Calculate the bounding length of the cabinet and drawer
         cabinet_length, drawer_length = self.get_cabinet_and_drawer_bounding_length(xml_path)
 
-        print(f"Cabinet Bounding Length: {cabinet_length}")
-        print(f"Drawer Bounding Length: {drawer_length}")
+        # print(f"Cabinet Bounding Length: {cabinet_length}")
+        # print(f"Drawer Bounding Length: {drawer_length}")
 
         # Example usage
         body_name = "drawer_link"  # Replace with the body name you want to measure
@@ -370,10 +370,10 @@ class MugCleanup(SingleArmEnv_MG):
         # Get bounding box dimensions
         length, width, height = self.get_bounding_box_dimensions(xml_path, body_name)
 
-        print(f"Bounding Box Dimensions for '{body_name}':")
-        print(f"Length (X): {length}")
-        print(f"Width (Y): {width}")
-        print(f"Height (Z): {height}")
+        # print(f"Bounding Box Dimensions for '{body_name}':")
+        # print(f"Length (X): {length}")
+        # print(f"Width (Y): {width}")
+        # print(f"Height (Z): {height}")
 
         # Example usage
         body_name = "base"  # Replace with the body name you want to measure
@@ -381,10 +381,10 @@ class MugCleanup(SingleArmEnv_MG):
         # Get bounding box dimensions
         length, width, height = self.get_bounding_box_dimensions(xml_path, body_name)
 
-        print(f"Bounding Box Dimensions for '{body_name}':")
-        print(f"Length (X): {length}")
-        print(f"Width (Y): {width}")
-        print(f"Height (Z): {height}")
+        # print(f"Bounding Box Dimensions for '{body_name}':")
+        # print(f"Length (X): {length}")
+        # print(f"Width (Y): {width}")
+        # print(f"Height (Z): {height}")
 
 
     def _get_object_model(self):
@@ -1178,10 +1178,10 @@ class CubeCleanup_Mug_Novelty(MugCleanup):
             names += ["gripper1_to_obj_max_possible_dist"]
 
             @sensor(modality=modality)
-            def obj_max_possible_height_above_table1(obs_cache):
+            def obj_max_possible_height_above_table1_surface(obs_cache):
                 return 1.0 # assume the highest an object can be is 1.0m above the table
-            sensors += [obj_max_possible_height_above_table1]
-            names += ["obj_max_possible_height_above_table1"]
+            sensors += [obj_max_possible_height_above_table1_surface]
+            names += ["obj_max_possible_height_above_table1_surface"]
 
             @sensor(modality=modality)
             def height_of_block1_lowest_point_above_table1_surface(obs_cache):
