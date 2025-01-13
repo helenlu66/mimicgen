@@ -400,13 +400,13 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             actives += [True]
 
             @sensor(modality=modality)
-            def gripper1_to_obj_max_absolute_dist(obs_cache):
+            def gripper1_to_obj_max_possible_dist(obs_cache):
                 table_size = self.model.mujoco_arena.table_full_size
                 # assume the highest the robot can reach is 1.0m above the table
                 max_dist = [dist for dist in table_size]  # copy the table size
                 max_dist[2] += 1.0
                 return max_dist
-            sensors += [gripper1_to_obj_max_absolute_dist]
+            sensors += [gripper1_to_obj_max_possible_dist]
             names += ["gripper1_to_obj_max_possible_dist"]
             actives += [True]
 
@@ -450,14 +450,14 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
             def square_peg1_height(obs_cache):
                 return top_of_square_peg[2] - 0.82
             sensors += [square_peg1_height]
-            names += ["square-peg1_height"]
+            names += ["height_threshold_required_to_be_on_or_off_square-peg1"]
             actives += [True]
 
             @sensor(modality=modality)
             def round_peg1_height(obs_cache):
                 return top_of_round_peg[2] - 0.82
             sensors += [round_peg1_height]
-            names += ["round-peg1_height"]
+            names += ["height_threshold_required_to_be_on_or_off_round-peg1"]
             actives += [True]
 
             @sensor(modality=modality)

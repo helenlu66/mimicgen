@@ -733,7 +733,7 @@ class MugCleanup(SingleArmEnv_MG):
         # optional contact based method that I don't think works as well.
         # return self.check_contact(self.mug, self.cube)
         percent_overlap = self.estimate_obj1_overlap_w_obj2(obj_name, "mug")
-        return percent_overlap > 0.5 # obj is considered in the mug if 50% of it is inside the mug
+        return percent_overlap > 0.5 # obj is considered in the mug if % of it is inside the mug
     
     def check_drawer_open(self):
         """
@@ -1168,20 +1168,20 @@ class CubeCleanup_Mug_Novelty(MugCleanup):
             names += block_sensor_names
 
             @sensor(modality=modality)
-            def gripper1_to_obj_max_absolute_dist(obs_cache):
+            def gripper1_to_obj_max_possible_dist(obs_cache):
                 table_size = self.model.mujoco_arena.table_full_size
                 # assume the highest the robot can reach is 1.0m above the table
                 max_dist = [dist for dist in table_size]  # copy the table size
                 max_dist[2] += 1.0
                 return max_dist
-            sensors += [gripper1_to_obj_max_absolute_dist]
-            names += ["gripper1_to_obj_max_absolute_dist"]
+            sensors += [gripper1_to_obj_max_possible_dist]
+            names += ["gripper1_to_obj_max_possible_dist"]
 
             @sensor(modality=modality)
-            def max_height_above_table1(obs_cache):
+            def obj_max_possible_height_above_table1(obs_cache):
                 return 1.0 # assume the highest an object can be is 1.0m above the table
-            sensors += [max_height_above_table1]
-            names += ["max_height_above_table1"]
+            sensors += [obj_max_possible_height_above_table1]
+            names += ["obj_max_possible_height_above_table1"]
 
             @sensor(modality=modality)
             def height_of_block1_lowest_point_above_table1_surface(obs_cache):
