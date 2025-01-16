@@ -272,6 +272,22 @@ class MugCleanup(SingleArmEnv_MG):
         # Arena always gets set to zero origin
         mujoco_arena.set_origin([0, 0, 0])
 
+        camera_position = [
+            xpos[0] - 0.1,
+            xpos[1] - 0.25,
+            xpos[2] + 1.35
+        ]
+
+        # print("Robot orientation" + str(self.robots[0].robot_model.base_xmat))
+
+        # Add third-person camera
+        mujoco_arena.set_camera(
+            camera_name="third_person",
+            pos=camera_position,  # Adjust position for a good third-person view
+            # Adjust orientation (e.g., looking downward and slightly tilted)
+            quat=[0.612, -0.340, -0.346, 0.624],
+        )
+
         # Add camera with full tabletop perspective
         self._add_agentview_full_camera(mujoco_arena)
 
