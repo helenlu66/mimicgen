@@ -435,15 +435,15 @@ class MugCleanup(SingleArmEnv_MG):
                 reference=self.table_offset,
             ),
             mug=dict(
-                x=(-0.15, 0.15),
-                y=(-0.25, -0.1),
-                z_rot=(0., 2. * np.pi),
+                x=(0.125, 0.129),
+                y=(-0.279, -0.283),
+                z_rot=(5*np.pi/4, 7*np.pi/4), # handle points away from the robot
                 reference=self.table_offset,
             ),
             cube=dict(
-                x=(-0.15, 0.15),
-                y=(-0.25, -0.1),
-                z_rot=(0., 2. * np.pi),
+                x=(0.125, 0.129),
+                y=(-0.279, -0.283),
+                z_rot=(5*np.pi/4, 7*np.pi/4),
                 reference=self.table_offset,
             ),
         )
@@ -1046,7 +1046,7 @@ class CubeCleanup_Mug_Novelty(MugCleanup):
 
         # Calculate the cube's position relative to the mug
         # Assuming the mug's opening is along the positive z-axis
-        cube_offset = np.array([0.0, 0.0, -0.01])  # Adjust the offset to place the cube inside the mug
+        cube_offset = np.array([0.0, -0.01, -0.01])  # Adjust the offset to place the cube inside the mug
 
         # Rotate the offset by the mug's orientation
         cube_offset_rotated = T.quat2mat(mug_quat).dot(cube_offset)
