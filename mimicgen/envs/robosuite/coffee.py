@@ -1052,8 +1052,8 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
                 # x=(0.05, 0.20),
                 # y=(-0.25, -0.05),
                 # z_rot=(0.0, 0.0),
-                x=(0.05, 0.20),
-                y=(0.05, 0.25),
+                x=(-0.025, -0.025),
+                y=(-0.125, -0.125),
                 z_rot=(0.0, 0.0), 
                 reference=self.table_offset,
             ),
@@ -1106,9 +1106,9 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
                 rotation=bounds["mug"]["z_rot"],
                 rotation_axis='z',
                 ensure_object_boundary_in_range=False,
-                ensure_valid_placement=True,
+                ensure_valid_placement=False,
                 reference_pos=bounds["mug"]["reference"],
-                z_offset=0.02,
+                z_offset=0.05,
             )
         )
 
