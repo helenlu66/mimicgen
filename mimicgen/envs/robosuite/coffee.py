@@ -1288,9 +1288,9 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
             @sensor(modality=modality)
             def gripper1_to_any_obj_max_absolute_dist(obs_cache):
                 table_size = self.model.mujoco_arena.table_full_size
-                # assume the highest the robot can reach is 1.0m above the table
+                # assume the highest the robot can reach is 0.9m above the table
                 max_dist = [dist for dist in table_size]  # copy the table size
-                max_dist[2] += 1.0
+                max_dist[2] += 0.9
                 return max_dist
             sensors += [gripper1_to_any_obj_max_absolute_dist]
             names += ["gripper1_to_any_obj_max_absolute_dist"]

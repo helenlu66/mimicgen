@@ -1170,16 +1170,16 @@ class CubeCleanup_Mug_Novelty(MugCleanup):
             @sensor(modality=modality)
             def gripper1_to_obj_max_possible_dist(obs_cache):
                 table_size = self.model.mujoco_arena.table_full_size
-                # assume the highest the robot can reach is 1.0m above the table
+                # assume the highest the robot can reach is 0.9m above the table
                 max_dist = [dist for dist in table_size]  # copy the table size
-                max_dist[2] += 1.0
+                max_dist[2] += 0.9
                 return max_dist
             sensors += [gripper1_to_obj_max_possible_dist]
             names += ["gripper1_to_obj_max_possible_dist"]
 
             @sensor(modality=modality)
             def obj_max_possible_height_above_table1_surface(obs_cache):
-                return 1.0 # assume the highest an object can be is 1.0m above the table
+                return 0.9 # assume the highest an object can be is 0.9m above the table
             sensors += [obj_max_possible_height_above_table1_surface]
             names += ["obj_max_possible_height_above_table1_surface"]
 
