@@ -435,14 +435,14 @@ class MugCleanup(SingleArmEnv_MG):
                 reference=self.table_offset,
             ),
             mug=dict(
-                x=(0.125, 0.129),
-                y=(-0.279, -0.283),
-                z_rot=(5*np.pi/4, 7*np.pi/4), # handle points away from the robot
+                x=(0.125, 0.130),
+                y=(-0.278, -0.283),
+                z_rot=(5*np.pi/4, 7*np.pi/4), # mug handle points away from the robot
                 reference=self.table_offset,
             ),
             cube=dict(
-                x=(0.125, 0.129),
-                y=(-0.279, -0.283),
+                x=(0.125, 0.130),
+                y=(-0.278, -0.283),
                 z_rot=(5*np.pi/4, 7*np.pi/4),
                 reference=self.table_offset,
             ),
