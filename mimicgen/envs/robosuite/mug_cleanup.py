@@ -434,30 +434,30 @@ class MugCleanup(SingleArmEnv_MG):
                 z_rot=(0., 0.),
                 reference=self.table_offset,
             ),
-            # mug=dict(
-            #     x=(0.125, 0.130),
-            #      y=(-0.283, -0.278),
-            #     z_rot=(5*np.pi/4, 7*np.pi/4), # mug handle points away from the robot
-            #     reference=self.table_offset,
-            # ),
-            # cube=dict(
-            #     x=(0.125, 0.130),
-            #     y=(-0.283, -0.278),
-            #     z_rot=(5*np.pi/4, 7*np.pi/4),
-            #     reference=self.table_offset,
-            # ),
             mug=dict(
-                x=(0.0, 0.1), # mug is placed in table center
-                y=(-0.026, -0.016),
+                x=(0.125, 0.130),
+                 y=(-0.283, -0.278),
                 z_rot=(5*np.pi/4, 7*np.pi/4), # mug handle points away from the robot
                 reference=self.table_offset,
             ),
             cube=dict(
-                x=(0.0, 0.1), # cube is placed in table center inside the mug
-                y=(-0.026, -0.016),
+                x=(0.125, 0.130),
+                y=(-0.283, -0.278),
                 z_rot=(5*np.pi/4, 7*np.pi/4),
                 reference=self.table_offset,
             ),
+            # mug=dict(
+            #     x=(0.0, 0.1), # mug is placed in table center
+            #     y=(-0.026, -0.016),
+            #     z_rot=(5*np.pi/4, 7*np.pi/4), # mug handle points away from the robot
+            #     reference=self.table_offset,
+            # ),
+            # cube=dict(
+            #     x=(0.0, 0.1), # cube is placed in table center inside the mug
+            #     y=(-0.026, -0.016),
+            #     z_rot=(5*np.pi/4, 7*np.pi/4),
+            #     reference=self.table_offset,
+            # ),
         )
 
     def _get_placement_initializer(self):
@@ -509,6 +509,7 @@ class MugCleanup(SingleArmEnv_MG):
         )
         self.drawer_qpos_addr = self.sim.model.get_joint_qpos_addr(self.drawer.joints[0])
         self.drawer_bottom_geom_id = self.sim.model.geom_name2id("DrawerObject_drawer_bottom")
+        self.drawer_handle_mid_geom_id = self.sim.model.geom_name2id("DrawerObject_drawer_handle_2")
 
     def _reset_internal(self):
         """
@@ -540,6 +541,30 @@ class MugCleanup(SingleArmEnv_MG):
         # self.sim.data.qpos[self.drawer_qpos_addr] = -0.135
         self.sim.forward()
 
+    def rename_observables(self, observables):
+        """
+        Make copies of the observables with names that match the planning domain.
+        """
+        # Positions of objects
+        observables['gripper1_pos'] = observables.pop('robot0_eef_pos')
+        observables['griper1_fingers_qpos'] = observables.pop('robot0_gripper_fingers_qpos')
+        observables['mug1_pos'] = observables.pop('mug_pos')
+        observables['drawer1_cabinet_pos'] = observables.pop('drawer_pos')
+        observables['drawer1_handle_pos'] = observables.pop('drawer_handle_pos')
+        observables['block1_pos'] = observables.pop('cube_pos')
+        observables['table1_pos'] = observables.pop('table_pos')
+        
+        # Orientations of objects
+        observables['gripper1_euler_angles'] = observables.pop('robot0_eef_euler_angles')
+        observables['mug1_euler_angles'] = observables.pop('mug_euler_angles')
+        observables['drawer1_cabinet_euler_angles'] = observables.pop('drawer_euler_angles')
+        observables['drawer1_handle_euler_angles'] = observables.pop('drawer_handle_euler_angles')
+        observables['block1_euler_angles'] = observables.pop('cube_euler_angles')
+        observables['table1_euler_angles'] = observables.pop('table_euler_angles')
+        
+
+        return observables
+    
     def _setup_observables(self):
         """
         Sets up observables to be used for this environment. Creates object-based observables if enabled
@@ -571,12 +596,39 @@ class MugCleanup(SingleArmEnv_MG):
                 names += obj_sensor_names
                 actives += [True] * len(obj_sensors)
 
-            # add joint position of drawer
             @sensor(modality=modality)
             def drawer_joint_pos(obs_cache):
                 return np.array([self.sim.data.qpos[self.drawer_qpos_addr]])
             sensors += [drawer_joint_pos]
             names += ["drawer_joint_pos"]
+            actives += [False] # set to false to avoid cluttering the observation space
+
+            @sensor(modality=modality)
+            def drawer_handle_pos(obs_cache):
+                return np.array(self.sim.data.geom_xpos[self.drawer_handle_mid_geom_id])
+            sensors += [drawer_handle_pos]
+            names += ["drawer_handle_pos"]
+            actives += [True]
+
+            @sensor(modality=modality)
+            def drawer_handle_euler_angles(obs_cache):
+                return T.mat2euler(T.quat2mat(self.sim.data.geom_xmat[self.drawer_handle_mid_geom_id]).reshape(3, 3))
+            sensors += [drawer_handle_euler_angles]
+            names += ["drawer_handle_euler_angles"]
+            actives += [True]
+
+            @sensor(modality=modality)
+            def table_pos(obs_cache):
+                return np.array(self.table_offset)
+            sensors += [table_pos]
+            names += ["table_pos"]
+            actives += [True]
+
+            @sensor(modality=modality)
+            def table_euler_angles(obs_cache):
+                return np.array([0, 0, 0])
+            sensors += [table_euler_angles]
+            names += ["table_euler_angles"]
             actives += [True]
 
             # Create observables
@@ -587,8 +639,9 @@ class MugCleanup(SingleArmEnv_MG):
                     sampling_rate=self.control_freq,
                     active=active,
                 )
-
+        observables = self.rename_observables(observables)
         return observables
+    
 
     def _create_obj_sensors(self, obj_name, modality="object"):
         """
@@ -614,6 +667,10 @@ class MugCleanup(SingleArmEnv_MG):
         @sensor(modality=modality)
         def obj_quat(obs_cache):
             return T.convert_quat(self.sim.data.body_xquat[self.obj_body_id[obj_name]], to="xyzw")
+        
+        @sensor(modality=modality)
+        def obj_euler_angles(obs_cache):
+            return T.mat2euler(T.quat2mat(T.convert_quat(self.sim.data.body_xquat[self.obj_body_id[obj_name]], to="xyzw")))
 
         @sensor(modality=modality)
         def obj_to_eef_pos(obs_cache):
@@ -632,8 +689,8 @@ class MugCleanup(SingleArmEnv_MG):
             return obs_cache[f"{obj_name}_to_{pf}eef_quat"] if \
                 f"{obj_name}_to_{pf}eef_quat" in obs_cache else np.zeros(4)
 
-        sensors = [obj_pos, obj_quat, obj_to_eef_pos, obj_to_eef_quat]
-        names = [f"{obj_name}_pos", f"{obj_name}_quat", f"{obj_name}_to_{pf}eef_pos", f"{obj_name}_to_{pf}eef_quat"]
+        sensors = [obj_pos, obj_euler_angles]
+        names = [f"{obj_name}_pos", f"{obj_name}_euler_angles"]
 
         return sensors, names
 
@@ -1073,170 +1130,7 @@ class CubeCleanup_Mug_Novelty(MugCleanup):
         )
         self.sim.forward()
     
-    def rename_observables(self, observables):
-        """
-        Make copies of the observables with names that match the planning domain.
-        """
-        # Positions and orientations of objects
-        observables['gripper1_pos'] = observables.pop('robot0_eef_pos')
-        observables['gripper1_quat'] = observables.pop('robot0_eef_quat')
-        observables['mug1_pos'] = observables.pop('mug_pos')
-        observables['mug1_quat'] = observables.pop('mug_quat')
-        observables['drawer1_pos'] = observables.pop('drawer_pos')
-        observables['drawer1_quat'] = observables.pop('drawer_quat')
-        observables['block1_pos'] = observables.pop('cube_pos')
-        observables['block1_quat'] = observables.pop('cube_quat')
-        
-        # Distances between gripper and objects
-        observables['gripper1_to_mug1_dist'] = observables.pop('mug_to_robot0_eef_pos')
-        observables['gripper1_to_mug1_quat'] = observables.pop('mug_to_robot0_eef_quat')
-        observables['gripper1_to_block1_dist'] = observables.pop('cube_to_robot0_eef_pos')
-        observables['gripper1_to_block1_quat'] = observables.pop('cube_to_robot0_eef_quat')
-        observables['gripper1_to_drawer1_dist'] = observables.pop('drawer_to_robot0_eef_pos')
-        observables['gripper1_to_drawer1_quat'] = observables.pop('drawer_to_robot0_eef_quat')
 
-        observables['drawer1_joint_pos'] = observables.pop('drawer_joint_pos')
-
-        return observables
-
-    
-    def _create_overlap_sensors(self):
-        """
-        Create sensors for the overlap between objects.
-        """
-        sensors = []
-        names = []
-
-        # Get robot prefix and define observables modality
-        pf = self.robots[0].robot_model.naming_prefix
-        modality = "object"
-        block1_mug1_overlap = self.estimate_obj1_overlap_w_obj2("cube", "mug")
-        block1_drawer1_overlap = self.estimate_obj1_overlap_w_obj2("cube", "drawer")
-        mug1_drawer1_overlap = self.estimate_obj1_overlap_w_obj2("mug", "drawer")
-        mug1_block1_overlap = self.estimate_obj1_overlap_w_obj2("mug", "cube")
-        drawer1_block1_overlap = self.estimate_obj1_overlap_w_obj2("drawer", "cube")
-        drawer1_mug1_overlap = self.estimate_obj1_overlap_w_obj2("drawer", "mug")
-
-        @sensor(modality=modality)
-        def percent_overlap_of_block1_with_mug1(obs_cache):
-            return block1_mug1_overlap
-        sensors += [percent_overlap_of_block1_with_mug1]
-        names += ["percent_overlap_of_block1_with_mug1"]
-
-        @sensor(modality=modality)
-        def percent_overlap_of_block1_with_drawer1(obs_cache):
-            return block1_drawer1_overlap
-        sensors += [percent_overlap_of_block1_with_drawer1]
-        names += ["percent_overlap_of_block1_with_drawer1"]
-
-        @sensor(modality=modality)
-        def percent_overlap_of_mug1_with_drawer1(obs_cache):
-            return mug1_drawer1_overlap
-        sensors += [percent_overlap_of_mug1_with_drawer1]
-        names += ["percent_overlap_of_mug1_with_drawer1"]
-
-        @sensor(modality=modality)
-        def percent_overlap_of_mug1_with_block1(obs_cache):
-            return mug1_block1_overlap
-        sensors += [percent_overlap_of_mug1_with_block1]
-        names += ["percent_overlap_of_mug1_with_block1"]
-
-        @sensor(modality=modality)
-        def percent_overlap_of_drawer1_with_block1(obs_cache):
-            return drawer1_block1_overlap
-        sensors += [percent_overlap_of_drawer1_with_block1]
-        names += ["percent_overlap_of_drawer1_with_block1"]
-
-        @sensor(modality=modality)
-        def percent_overlap_of_drawer1_with_mug1(obs_cache):
-            return drawer1_mug1_overlap
-        sensors += [percent_overlap_of_drawer1_with_mug1]
-        names += ["percent_overlap_of_drawer1_with_mug1"]
-
-        return sensors, names
-
-    def _setup_observables(self):
-        observables = super()._setup_observables()
-
-        observables = self.rename_observables(observables)
-
-        if self.use_object_obs:
-            # Get robot prefix and define observables modality
-            pf = self.robots[0].robot_model.naming_prefix
-            modality = "object"
-            block1_id = self.sim.model.body_name2id(self.cube.root_body)
-            drawer1_id = self.sim.model.body_name2id(self.drawer.root_body)
-            mug1_id = self.sim.model.body_name2id(self.mug.root_body)
-
-            # Add cube sensors
-            block_sensors, block_sensor_names = self._create_obj_sensors(
-                obj_name="cube", modality=modality
-            )
-
-            # Add overlap sensors
-            sensors, names = self._create_overlap_sensors()
-
-            sensors += block_sensors
-            names += block_sensor_names
-
-            @sensor(modality=modality)
-            def gripper1_to_obj_max_possible_dist(obs_cache):
-                table_size = self.model.mujoco_arena.table_full_size
-                # assume the highest the robot can reach is 0.9m above the table
-                max_dist = [dist for dist in table_size]  # copy the table size
-                max_dist[2] += 0.9
-                return max_dist
-            sensors += [gripper1_to_obj_max_possible_dist]
-            names += ["gripper1_to_obj_max_possible_dist"]
-
-            @sensor(modality=modality)
-            def obj_max_possible_height_above_table1_surface(obs_cache):
-                return 0.9 # assume the highest an object can be is 0.9m above the table
-            sensors += [obj_max_possible_height_above_table1_surface]
-            names += ["obj_max_possible_height_above_table1_surface"]
-
-            @sensor(modality=modality)
-            def height_of_block1_lowest_point_above_table1_surface(obs_cache):
-                table1_height = self.table_offset[2]
-                block1_pos = self.sim.data.body_xpos[block1_id]
-                # estimate the lowest point to be half bounding box below the center
-                block1_half_bounding_box = self.cube.get_bounding_box_half_size()
-                lowest_block1_point = block1_pos[2] - block1_half_bounding_box[2]
-                return max(0, lowest_block1_point - table1_height) # make sure it's non-negative
-            sensors += [height_of_block1_lowest_point_above_table1_surface]
-            names += ["height_of_block1_lowest_point_above_table1_surface"]
-
-            @sensor(modality=modality)
-            def height_of_mug1_lowest_point_above_table1_surface(obs_cache):
-                table1_height = self.table_offset[2]
-                mug1_pos = self.sim.data.body_xpos[mug1_id]
-                # estimate the lowest point to be half bounding box below the center
-                mug1_half_bounding_box = self.mug.get_bounding_box_half_size()
-                lowest_mug1_point = mug1_pos[2] - mug1_half_bounding_box[2]
-                return max(0, lowest_mug1_point - table1_height) # make sure it's non-negative
-            sensors += [height_of_mug1_lowest_point_above_table1_surface]
-            names += ["height_of_mug1_lowest_point_above_table1_surface"]
-
-            @sensor(modality=modality)
-            def height_of_drawer1_lowest_point_above_table1_surface(obs_cache):
-                table1_height = self.table_offset[2]
-                drawer1_pos = self.sim.data.body_xpos[drawer1_id]
-                # estimate the lowest to be half bounding box below the center
-                drawer1_half_bounding_box = self.drawer.get_bounding_box_half_size()
-                lowest_drawer1_point = drawer1_pos[2] - drawer1_half_bounding_box[2]
-                return max(0, lowest_drawer1_point - table1_height) # make sure it's non-negative
-            sensors += [height_of_drawer1_lowest_point_above_table1_surface]
-            names += ["height_of_drawer1_lowest_point_above_table1_surface"]
-
-
-            for name, s in zip(names, sensors):
-                observables[name] = Observable(
-                    name=name,
-                    sensor=s,
-                    sampling_rate=self.control_freq,
-                    active=True,
-                )
-        return observables
 
         
 

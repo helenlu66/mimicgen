@@ -351,7 +351,7 @@ class Coffee_Pre_Novelty(SingleArmEnv_MG):
         # Additional object references for this env
         self.obj_body_id = dict(
             coffee_pod=self.sim.model.body_name2id(self.coffee_pod.root_body),
-            coffee_machine=self.sim.model.body_name2id(self.coffee_machine.root_body),
+            # coffee_machine=self.sim.model.body_name2id(self.coffee_machine.root_body), don't need coffee machine pos and angles for RL
             coffee_pod_holder=self.sim.model.body_name2id("coffee_machine_pod_holder_root"),
             coffee_machine_lid=self.sim.model.body_name2id("coffee_machine_lid_main"),
         )
@@ -431,10 +431,6 @@ class Coffee_Pre_Novelty(SingleArmEnv_MG):
                 names += obj_sensor_names
                 actives += [True] * len(obj_sensors)
 
-            obj_centric_sensors, obj_centric_sensor_names = self._create_obj_centric_sensors(modality="object_centric")
-            sensors += obj_centric_sensors
-            names += obj_centric_sensor_names
-            actives += [True] * len(obj_centric_sensors)
 
             # add hinge angle of lid
             @sensor(modality=modality)
@@ -442,7 +438,7 @@ class Coffee_Pre_Novelty(SingleArmEnv_MG):
                 return np.array([self.sim.data.qpos[self.hinge_qpos_addr]])
             sensors += [hinge_angle]
             names += ["hinge_angle"]
-            actives += [True]
+            actives += [False]
 
             # Create observables
             for name, s, active in zip(names, sensors, actives):
@@ -481,6 +477,10 @@ class Coffee_Pre_Novelty(SingleArmEnv_MG):
             return T.convert_quat(self.sim.data.body_xquat[self.obj_body_id[obj_name]], to="xyzw")
 
         @sensor(modality=modality)
+        def obj_euler_angles(obs_cache):
+            return T.mat2euler(T.quat2mat(T.convert_quat(self.sim.data.body_xquat[self.obj_body_id[obj_name]], to="xyzw")))
+        
+        @sensor(modality=modality)
         def obj_to_eef_pos(obs_cache):
             # Immediately return default value if cache is empty
             if any([name not in obs_cache for name in
@@ -498,8 +498,8 @@ class Coffee_Pre_Novelty(SingleArmEnv_MG):
             return obs_cache[f"{obj_name}_to_{pf}eef_quat"] if \
                 f"{obj_name}_to_{pf}eef_quat" in obs_cache else np.zeros(4)
 
-        sensors = [obj_pos, obj_quat, obj_to_eef_pos, obj_to_eef_quat]
-        names = [f"{obj_name}_pos", f"{obj_name}_quat", f"{obj_name}_to_{pf}eef_pos", f"{obj_name}_to_{pf}eef_quat"]
+        sensors = [obj_pos, obj_euler_angles]
+        names = [f"{obj_name}_pos", f"{obj_name}_euler_angles"]
 
         return sensors, names
 
@@ -1038,7 +1038,7 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
             coffee_machine=dict(
                 x=(-0.15, -0.15),
                 y=(-0.25, -0.25),
-                z_rot=(-np.pi / 6., -np.pi / 6.),
+                z_rot=(0, 0),
                 # put vertical
                 # z_rot=(-np.pi / 2., -np.pi / 2.),
                 reference=self.table_offset,
@@ -1059,7 +1059,7 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
             ),
             coffee_pod=dict(
                 x=(-0.03, 0.03),
-                y=(-0.05, 0.03),
+                y=(-0.02, 0.00),
                 z_rot=(0.0, 0.0),
                 reference=np.array((0., 0., 0.)),
             ),
@@ -1143,6 +1143,7 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         self.obj_body_id["drawer"] = self.sim.model.body_name2id(self.drawer.root_body)
         self.obj_body_id["mug"] = self.sim.model.body_name2id(self.mug.root_body)
         self.drawer_bottom_geom_id = self.sim.model.geom_name2id("DrawerObject_drawer_bottom")
+        self.drawer_handle_mid_geom_id = self.sim.model.geom_name2id("DrawerObject_drawer_handle_2")
 
     def _reset_internal(self):
         """
@@ -1218,43 +1219,27 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         """
         Make copies of the observables with names that match the planning domain.
         """
-        # Positions and orientations of objects
+        # Positions of objects
         observables['gripper1_pos'] = observables.pop('robot0_eef_pos')
-        observables['gripper1_quat'] = observables.pop('robot0_eef_quat')
+        observables['griper1_fingers_qpos'] = observables.pop('robot0_gripper_fingers_qpos')
+        observables['drawer1_cabinet_pos'] = observables.pop('drawer_pos')
+        observables['drawer1_handle_pos'] = observables.pop('drawer_handle_pos')
+        observables['coffee_pod1_pos'] = observables.pop('coffee_pod_pos')
+        observables['coffee_pod_holder1_pos'] = observables.pop('coffee_pod_holder_pos')
         observables['mug1_pos'] = observables.pop('mug_pos')
-        observables['mug1_quat'] = observables.pop('mug_quat')
-        observables['drawer1_pos'] = observables.pop('drawer_pos')
-        observables['drawer1_quat'] = observables.pop('drawer_quat')
-        observables['coffee-pod1_pos'] = observables.pop('coffee_pod_pos')
-        observables['coffee-pod1_quat'] = observables.pop('coffee_pod_quat')
-        observables['coffee-pod-holder1_pos'] = observables.pop('coffee_pod_holder_pos')
-        observables['coffee-pod-holder1_quat'] = observables.pop('coffee_pod_holder_quat')
-        observables['coffee-machine1_pos'] = observables.pop('coffee_machine_pos')
-        observables['coffee-machine1_quat'] = observables.pop('coffee_machine_quat')
         observables['lid1_pos'] = observables.pop('coffee_machine_lid_pos')
-        observables['lid1_quat'] = observables.pop('coffee_machine_lid_quat')
-
-        # Distances between pod and pod holder
-        observables['coffee-pod1_pos_rel_coffee-pod-holder1'] = observables.pop('pod_pos_rel_pod_holder')
-        observables['coffee-pod1_quat_rel_coffee-pod-holder1'] = observables.pop('pod_quat_rel_pod_holder')
+        observables['table1_pos'] = observables.pop('table_pos')
         
-        # Distances between gripper and objects
-        observables['gripper1_to_mug1_dist'] = observables.pop('mug_to_robot0_eef_pos')
-        observables['gripper1_to_mug1_quat'] = observables.pop('mug_to_robot0_eef_quat')
-        observables['gripper1_to_coffee-pod1-dist'] = observables.pop('coffee_pod_to_robot0_eef_pos')
-        observables['gripper1_to_coffee-pod1-quat'] = observables.pop('coffee_pod_to_robot0_eef_quat')
-        observables['gripper1_to_coffee-machine1-dist'] = observables.pop('coffee_machine_to_robot0_eef_pos')
-        observables['gripper1_to_coffee-machine1-quat'] = observables.pop('coffee_machine_to_robot0_eef_quat')
-        observables['gripper1_to_lid1_dist'] = observables.pop('coffee_machine_lid_to_robot0_eef_pos')
-        observables['gripper1_to_lid1_quat'] = observables.pop('coffee_machine_lid_to_robot0_eef_quat')
-        observables['gripper1_to_drawer1_dist'] = observables.pop('drawer_to_robot0_eef_pos')
-        observables['gripper1_to_drawer1_quat'] = observables.pop('drawer_to_robot0_eef_quat')
+        # Orientations of objects
+        observables['gripper1_euler_angles'] = observables.pop('robot0_eef_euler_angles')
+        observables['drawer1_cabinet_euler_angles'] = observables.pop('drawer_euler_angles')
+        observables['drawer1_handle_euler_angles'] = observables.pop('drawer_handle_euler_angles')
+        observables['coffee_pod1_euler_angles'] = observables.pop('coffee_pod_euler_angles')
+        observables['coffee_pod_holder1_euler_angles'] = observables.pop('coffee_pod_holder_euler_angles')
+        observables['mug1_euler_angles'] = observables.pop('mug_euler_angles')
+        observables['lid1_euler_angles'] = observables.pop('coffee_machine_lid_euler_angles')
+        observables['table1_euler_angles'] = observables.pop('table_euler_angles')
 
-        # Avoid using drawer joint position as it should not be observable to the robot as a novel object
-        # observables.pop('drawer_joint_pos')
-        
-        # object joint angles
-        observables['lid1_hinge_angle'] = observables.pop('hinge_angle')
 
         return observables
     
@@ -1269,55 +1254,53 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         # super class will populate observables for "mug" and "drawer" poses in addition to coffee machine and coffee pod
         observables = super()._setup_observables()
 
-        drawer_opening_percentage = self.check_drawer_open_percentage()
-
         if self.use_object_obs:
             modality = "object"
 
             # add drawer joint angle observable
-            # @sensor(modality=modality)
-            # def drawer_joint_angle(obs_cache):
-            #     return np.array([self.sim.data.qpos[self.cabinet_qpos_addr]])
-            # sensors = [drawer_joint_angle]
-            # names = ["drawer_joint_angle"]
-            # actives = [True]
-
-            # add overlap sensors
-            sensors, names = self._create_overlap_sensors()
+            @sensor(modality=modality)
+            def drawer_joint_angle(obs_cache):
+                return np.array([self.sim.data.qpos[self.cabinet_qpos_addr]])
+            sensors = [drawer_joint_angle]
+            names = ["drawer_joint_angle"]
+            actives = [False]
 
             @sensor(modality=modality)
-            def gripper1_to_any_obj_max_absolute_dist(obs_cache):
-                table_size = self.model.mujoco_arena.table_full_size
-                # assume the highest the robot can reach is 0.9m above the table
-                max_dist = [dist for dist in table_size]  # copy the table size
-                max_dist[2] += 0.9
-                return max_dist
-            sensors += [gripper1_to_any_obj_max_absolute_dist]
-            names += ["gripper1_to_any_obj_max_absolute_dist"]
-
-            # add drawer's max travel distance observable
-            @sensor(modality=modality)
-            def drawer1_cabinet_side_length(obs_cache):
-                return self.drawer.drawer_side_wall_size[1]
-            sensors += [drawer1_cabinet_side_length]
-            names += ["drawer1_cabinet_side_length"]
-    
+            def drawer_handle_pos(obs_cache):
+                return np.array(self.sim.data.geom_xpos[self.drawer_handle_mid_geom_id])
+            sensors += [drawer_handle_pos]
+            names += ["drawer_handle_pos"]
+            actives += [True]
 
             @sensor(modality=modality)
-            def drawer1_travel_distance(obs_cache):
-                return drawer_opening_percentage * self.drawer.max_drawer_travel_distance
-            sensors += [drawer1_travel_distance]
-            names += ["drawer1_travel_distance"]
+            def drawer_handle_euler_angles(obs_cache):
+                return T.mat2euler(T.quat2mat(self.sim.data.geom_xmat[self.drawer_handle_mid_geom_id]).reshape(3, 3))
+            sensors += [drawer_handle_euler_angles]
+            names += ["drawer_handle_euler_angles"]
+            actives += [True]
 
+            @sensor(modality=modality)
+            def table_pos(obs_cache):
+                return np.array(self.table_offset)
+            sensors += [table_pos]
+            names += ["table_pos"]
+            actives += [True]
+
+            @sensor(modality=modality)
+            def table_euler_angles(obs_cache):
+                return np.array([0, 0, 0])
+            sensors += [table_euler_angles]
+            names += ["table_euler_angles"]
+            actives += [True]
 
 
             # Create observables
-            for name, s in zip(names, sensors):
+            for name, s, active in zip(names, sensors, actives):
                 observables[name] = Observable(
                     name=name,
                     sensor=s,
                     sampling_rate=self.control_freq,
-                    active=True,
+                    active=active,
                 )
         
         observables = self.rename_observables(observables)
@@ -1453,7 +1436,7 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         """
         Returns true if drawer is open.
         """
-        return (self.sim.data.qpos[self.cabinet_qpos_addr] <= -0.13)
+        return (self.sim.data.qpos[self.cabinet_qpos_addr] <= -0.19)
     
     def check_drawer_open_percentage(self) -> float:
         """Returns how open the drawer is as a percentage.
@@ -1462,7 +1445,7 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
             float: Percentage of how open the drawer is (0.0 to 1.0).
         """
         closed_joint_angle = 0.0
-        open_joint_angle = -0.13
+        open_joint_angle = -0.19
         joint_angle_range = closed_joint_angle - open_joint_angle # 0.13
         joint_angle = self.sim.data.qpos[self.cabinet_qpos_addr] # might be more negative than -0.13
         if joint_angle < open_joint_angle:
