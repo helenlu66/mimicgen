@@ -425,7 +425,8 @@ class MugCleanup(SingleArmEnv_MG):
                 x: 2-tuple for low and high values for uniform sampling of x-position
                 y: 2-tuple for low and high values for uniform sampling of y-position
                 z_rot: 2-tuple for low and high values for uniform sampling of z-rotation
-                reference: np array of shape (3,) for reference position in world frame (assumed to be static and not change)
+                reference: np array of shape (3,) for reference position in 
+                           world frame (assumed to be static and not change)
         """
         return dict(
             drawer=dict(
@@ -1097,7 +1098,7 @@ class CubeCleanup_Pre_Novelty(MugCleanup):
             )
         )
 
-# region CubeCleanup_Mug_Novelty
+# region CubeCleanup_Mug_Novelty ###############################################
 class CubeCleanup_Mug_Novelty(MugCleanup):
 
     def _reset_internal(self):
@@ -1130,11 +1131,86 @@ class CubeCleanup_Mug_Novelty(MugCleanup):
         )
         self.sim.forward()
     
-
-
+    def _place_mug_in_gripper(self):
+        """
+        Place the mug so that it is spawned inside the robot gripper.
+        """
+        super()._reset_internal()
+        # self._set_gripper_state()
         
+        # Get the gripper's pose
+        gripper_body_id = self.sim.model.body_name2id(
+            self.robots[0].gripper.root_body)
+        gripper_pos = self.sim.data.body_xpos[gripper_body_id]
+        gripper_quat = T.convert_quat(
+            self.sim.data.body_xquat[gripper_body_id], to='xyzw')
 
-# region MugCleanup_D1
+        # Define an offset in the gripper's frame to position the mug correctly
+        mug_offset = np.array([0, 0, -0.106])
+        
+        # Rotate the offset into the global frame
+        # mug_offset_global = T.quat2mat(gripper_quat).dot(mug_offset)
+        mug_pos = gripper_pos + mug_offset
+
+        # Optional, align the mug's orientation with the gripper's orientation.
+        mug_mat = T.euler2mat(np.array([-1.430, -0.351, -1.554]))
+        mug_quat = T.mat2quat(mug_mat)
+        mug_quat = np.array([0,0.707,0,0.707])
+        
+        """
+        gripper pos array(array([-0.131, -0.069, 1.029]))
+        gripper fingers q pos array([0.352, -0.462, 0.178, 0.352, -0.464, 0.178])
+        gripper euler angles array([3.109, -0.134, 0.067], dtype=float32)
+        mug 1 pos array([-0.127, -0.084, 0.894])
+        mug 1 eulerangles array([-1.430, -0.351, -1.554], dtype=float32)
+        block1 pos array([0.118, -0.286, 0.821])
+        robot 0 proprio state array([-0.108, -0.078, 0.884, 0.352, -0.462, 0.178, 0.352, -0.464, 0.178,
+        3.109, -0.134, 0.067])
+
+
+        gripper pos array([-0.148, -0.026, 0.952])
+        gripper fingers q pos array([-0.026, -0.267, -0.200, -0.026, -0.267, -0.200])
+        gripper euler angles [3.1389687, 0.043367885, -0.022903763]
+        mug 1 pos array([0.127, -0.282, 0.831])
+        mug 1 eulerangles [0.0, -0.0, -1.1400311]
+        block1 pos array([0.118, -0.286, 0.821])
+        """
+        # Set the mug's joint qpos so that it spawns at the computed pose.
+        self.sim.data.set_joint_qpos(
+            self.mug.joints[0],
+            np.concatenate([mug_pos, mug_quat])
+        )
+
+        self.sim.data.set_joint_qpos(
+            self.cube.joints[0], np.concatenate([np.array([0,0,0.82]), np.array([1,0,0,0])])
+        )
+
+        self.sim.forward()
+
+    # def _set_gripper_state(self):
+    #     """
+    #     Sets the robot gripper’s base pose and finger joint configuration to the desired state.
+    #     """
+    #     # Desired gripper base state:
+    #     desired_gripper_pos = np.array([-0.148, -0.026, 0.952])
+    #     desired_gripper_euler = np.array([3.1389687, 0.043367885, -0.022903763])
+    #     # Convert euler angles to quaternion (adjust order as needed):
+    #     desired_gripper_mat = T.euler2mat(desired_gripper_euler)
+    #     desired_gripper_quat = T.mat2quat(desired_gripper_mat)
+        
+    #     # Retrieve the gripper's root body ID:
+    #     gripper_body_id = self.sim.model.body_name2id(self.robots[0].gripper.root_body)
+    #     # Set the gripper base pose in the model (this typically affects the initial simulation state)
+    #     self.sim.model.body_pos[gripper_body_id] = desired_gripper_pos
+    #     self.sim.model.body_quat[gripper_body_id] = desired_gripper_quat
+
+        # # Desired finger joint positions:
+        # desired_finger_qpos = np.array([-0.026, -0.267, -0.200, -0.026, -0.267, -0.200])
+        # # Get the indices of the gripper's finger joints.
+        # gripper_joint_idxs = self.robots[0].gripper.joint_indexes  # adjust if your API uses a different attribute
+        # self.sim.data.qpos[gripper_joint_idxs] = desired_finger_qpos
+
+# region MugCleanup_D1 #########################################################
 class MugCleanup_D1(MugCleanup_D0):
     """
     Wider initialization for both drawer and object.
