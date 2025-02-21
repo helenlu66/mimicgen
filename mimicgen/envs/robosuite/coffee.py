@@ -1215,6 +1215,16 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
 
             self.sim.data.set_joint_qpos(pod_obj.joints[0], np.concatenate([np.array(pod_pos), np.array(pod_quat)]))
 
+
+    def _reset_open_drawer_open_lid(self):
+        """
+        Reset the environment with the drawer open and the coffee machine lid open.
+        """
+        SingleArmEnv._reset_internal(self)
+        self.sim.data.qpos[self.cabinet_qpos_addr] = -0.135
+        self.sim.data.qpos[self.hinge_qpos_addr] = 2. * np.pi / 3.
+        self.sim.forward()
+
     def rename_observables(self, observables):
         """
         Make copies of the observables with names that match the planning domain.
