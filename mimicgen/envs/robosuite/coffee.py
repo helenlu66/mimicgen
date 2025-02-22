@@ -1036,8 +1036,10 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
                 reference=self.table_offset,
             ),
             coffee_machine=dict(
-                x=(-0.15, -0.15),
-                y=(-0.25, -0.25),
+                x = (-0.3, -0.3),
+                y = (-0.22, -0.22),
+                # x=(-0.15, -0.15),
+                # y=(-0.25, -0.25),
                 z_rot=(0, 0),
                 # put vertical
                 # z_rot=(-np.pi / 2., -np.pi / 2.),
@@ -1053,7 +1055,8 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
                 # y=(-0.25, -0.05),
                 # z_rot=(0.0, 0.0),
                 x=(-0.025, -0.025),
-                y=(-0.125, -0.125),
+                y=(0, 0),
+                # y=(-0.125, -0.125),
                 z_rot=(0.0, 0.0), 
                 reference=self.table_offset,
             ),
