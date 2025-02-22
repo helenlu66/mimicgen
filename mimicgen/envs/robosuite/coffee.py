@@ -1224,7 +1224,7 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         Reset the environment with the drawer open and the coffee machine lid open.
         """
         SingleArmEnv._reset_internal(self)
-        self.sim.data.qpos[self.cabinet_qpos_addr] = -0.135
+        self.sim.data.qpos[self.cabinet_qpos_addr] = -0.195
         self.sim.data.qpos[self.hinge_qpos_addr] = 2. * np.pi / 3.
         self.sim.forward()
 
