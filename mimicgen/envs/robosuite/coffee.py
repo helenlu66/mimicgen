@@ -1228,6 +1228,40 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         self.sim.data.qpos[self.hinge_qpos_addr] = 2. * np.pi / 3.
         self.sim.forward()
 
+        if not self.deterministic_reset:
+
+            # sample pod location relative to center of drawer bottom geom surface
+            coffee_pod_placement = self.pod_placement_initializer.sample(on_top=False)
+            assert len(coffee_pod_placement) == 1
+            rel_pod_pos, rel_pod_quat, pod_obj = list(coffee_pod_placement.values())[0]
+            rel_pod_pos, rel_pod_quat = np.array(rel_pod_pos), np.array(rel_pod_quat)
+            assert pod_obj is self.coffee_pod
+
+            # center of drawer bottom
+            drawer_bottom_geom_pos = np.array(self.sim.data.geom_xpos[self.drawer_bottom_geom_id])
+
+            # our x-y relative position is sampled with respect to drawer geom frame. Here, we use the drawer's rotation
+            # matrix to convert this relative position to a world relative position, so we can add it to the drawer world position
+            drawer_rot_mat = T.quat2mat(T.convert_quat(self.sim.model.body_quat[self.sim.model.body_name2id(self.drawer.root_body)], to="xyzw"))
+            rel_pod_pos[:2] = drawer_rot_mat[:2, :2].dot(rel_pod_pos[:2])
+
+            # also convert the sampled pod rotation to world frame
+            rel_pod_mat = T.quat2mat(T.convert_quat(rel_pod_quat, to="xyzw"))
+            pod_mat = drawer_rot_mat.dot(rel_pod_mat)
+            pod_quat = T.convert_quat(T.mat2quat(pod_mat), to="wxyz")
+
+            # get half-sizes of drawer geom and coffee pod to place coffee pod at correct z-location (on top of drawer bottom geom)
+            drawer_bottom_geom_z_offset = self.sim.model.geom_size[self.drawer_bottom_geom_id][-1] # half-size of geom in z-direction
+            coffee_pod_bottom_offset = np.abs(self.coffee_pod.bottom_offset[-1])
+            coffee_pod_z = drawer_bottom_geom_pos[2] + drawer_bottom_geom_z_offset + coffee_pod_bottom_offset + 0.001
+
+            # set coffee pod in center of drawer
+            pod_pos = np.array(drawer_bottom_geom_pos) + rel_pod_pos
+            pod_pos[-1] = coffee_pod_z
+
+            self.sim.data.set_joint_qpos(pod_obj.joints[0], np.concatenate([np.array(pod_pos), np.array(pod_quat)]))
+
+
     def rename_observables(self, observables):
         """
         Make copies of the observables with names that match the planning domain.
