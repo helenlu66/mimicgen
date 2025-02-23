@@ -1054,9 +1054,9 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
                 # x=(0.05, 0.20),
                 # y=(-0.25, -0.05),
                 # z_rot=(0.0, 0.0),
-                x=(-0.025, -0.025),
-                y=(0, 0),
-                # y=(-0.125, -0.125),
+                x=(-0.22, -0.22),
+                # y=(0, 0),
+                y=(-0.085, -0.085),
                 z_rot=(0.0, 0.0), 
                 reference=self.table_offset,
             ),
@@ -1224,6 +1224,27 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         Reset the environment with the drawer open and the coffee machine lid open.
         """
         SingleArmEnv._reset_internal(self)
+        
+        # Reset all object positions using initializer sampler if we're not directly loading from an xml
+        if not self.deterministic_reset:
+
+            # Sample from the placement initializer for all objects
+            object_placements = self.placement_initializer.sample()
+
+            # Loop through all objects and reset their positions
+            for obj_pos, obj_quat, obj in object_placements.values():
+                if obj is self.drawer:
+                    # object is fixture - set pose in model
+                    body_id = self.sim.model.body_name2id(obj.root_body)
+                    obj_pos_to_set = np.array(obj_pos)
+                    # obj_pos_to_set[2] = 0.905 # hardcode z-value to correspond to parent class
+                    obj_pos_to_set[2] = 0.805 # hardcode z-value to make sure it lies on table surface
+                    self.sim.model.body_pos[body_id] = obj_pos_to_set
+                    self.sim.model.body_quat[body_id] = obj_quat
+                else:
+                    # object has free joint - use it to set pose
+                    self.sim.data.set_joint_qpos(obj.joints[0], np.concatenate([np.array(obj_pos), np.array(obj_quat)]))
+        
         self.sim.data.qpos[self.cabinet_qpos_addr] = -0.195
         self.sim.data.qpos[self.hinge_qpos_addr] = 2. * np.pi / 3.
         self.sim.forward()
