@@ -1153,7 +1153,7 @@ class CubeCleanup_Mug_Novelty(MugCleanup):
         gripper_pos = self.sim.data.body_xpos[gripper_body_id]
 
         # Set the mug pose
-        mug_offset = np.array([0.015, 0, -0.12])
+        mug_offset = np.array([0.015, 0, -0.11])
         mug_pos = gripper_pos + mug_offset
         mug_quat = R.from_euler('XYZ', [0, 90, -90], degrees=True).as_quat()
 

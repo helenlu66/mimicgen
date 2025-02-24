@@ -1054,9 +1054,10 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
                 # x=(0.05, 0.20),
                 # y=(-0.25, -0.05),
                 # z_rot=(0.0, 0.0),
-                x=(-0.22, -0.22),
-                # y=(0, 0),
-                y=(-0.085, -0.085),
+                # middle
+                x=(-0.3, -0.3),
+                y=(0, 0),
+                # y=(-0.082, -0.082),
                 z_rot=(0.0, 0.0), 
                 reference=self.table_offset,
             ),
