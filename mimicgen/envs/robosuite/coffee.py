@@ -1055,14 +1055,15 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
                 # y=(-0.25, -0.05),
                 # z_rot=(0.0, 0.0),
                 # middle
-                x=(-0.3, -0.3),
-                y=(0, 0),
+                x=(-0.275, -0.275),
+                # y=(0, 0),
+                y=(-0.095, -0.095),
                 # y=(-0.082, -0.082),
                 z_rot=(0.0, 0.0), 
                 reference=self.table_offset,
             ),
             coffee_pod=dict(
-                x=(-0.03, 0.03),
+                x=(-0.032, 0.032),
                 y=(-0.02, 0.00),
                 z_rot=(0.0, 0.0),
                 reference=np.array((0., 0., 0.)),
@@ -1112,7 +1113,7 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
                 ensure_object_boundary_in_range=False,
                 ensure_valid_placement=False,
                 reference_pos=bounds["mug"]["reference"],
-                z_offset=0.05,
+                z_offset=0.01,
             )
         )
 
