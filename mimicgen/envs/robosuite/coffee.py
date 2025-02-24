@@ -1525,10 +1525,10 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
     
     def check_mug_upright(self):
         """Returns true if mug is upright. """
-        obj_rot = self.sim.data.body_xmat[self.obj_body_id["mug"]].reshape(3, 3)
-        z_axis = obj_rot[:3, 2]
-        dist_to_z_axis = 1. - z_axis[2]
-        return (dist_to_z_axis < 1e-3)
+        # get the euler angles of the mug
+        mug_euler_angles = T.mat2euler(T.quat2mat(T.convert_quat(self.sim.data.body_xquat[self.obj_body_id["mug"]], to="xyzw")))
+        # check if the mug is upright i.e. roll and pitch angles are smaller than 45
+        return np.all(np.abs(mug_euler_angles[:2]) < np.pi/4)
     
     def check_mug_under_pod_holder(self):
         """
