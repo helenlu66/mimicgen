@@ -437,14 +437,16 @@ class MugCleanup(SingleArmEnv_MG):
                 reference=self.table_offset,
             ),
             mug=dict(
-                x=(0.125, 0.130),
-                 y=(-0.283, -0.278),
+                x = (0.165, 0.170),
+                y = (-0.1, -0.05),
+                # x=(0.125, 0.130),
+                # y=(-0.283, -0.278),
                 z_rot=(5*np.pi/4, 7*np.pi/4), # mug handle points away from the robot
                 reference=self.table_offset,
             ),
             cube=dict(
-                x=(0.125, 0.130),
-                y=(-0.283, -0.278),
+                x = (0.165, 0.170),
+                y = (-0.1, -0.05),
                 z_rot=(5*np.pi/4, 7*np.pi/4),
                 reference=self.table_offset,
             ),
@@ -718,6 +720,13 @@ class MugCleanup(SingleArmEnv_MG):
         object_in_drawer = self.check_contact(drawer_bottom_geom, self.mug)
 
         return (object_in_drawer and object_upright and drawer_closed)
+    
+    def check_mug_upright(self):
+        """Returns true if mug is upright. """
+        # get the euler angles of the mug
+        mug_euler_angles = T.mat2euler(T.quat2mat(T.convert_quat(self.sim.data.body_xquat[self.obj_body_id["mug"]], to="xyzw")))
+        # check if the mug is upright i.e. roll and pitch angles are smaller than 45
+        return np.all(np.abs(mug_euler_angles[:2]) < np.pi/4)
 
     def visualize(self, vis_settings):
         """
@@ -1144,7 +1153,7 @@ class CubeCleanup_Mug_Novelty(MugCleanup):
         gripper_pos = self.sim.data.body_xpos[gripper_body_id]
 
         # Set the mug pose
-        mug_offset = np.array([0.015, 0, -0.1075])
+        mug_offset = np.array([0.015, 0, -0.12])
         mug_pos = gripper_pos + mug_offset
         mug_quat = R.from_euler('XYZ', [0, 90, -90], degrees=True).as_quat()
 

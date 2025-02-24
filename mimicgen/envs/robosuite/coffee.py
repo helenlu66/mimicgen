@@ -1292,8 +1292,8 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         observables['griper1_fingers_qpos'] = observables.pop('robot0_gripper_fingers_qpos')
         observables['drawer1_cabinet_pos'] = observables.pop('drawer_pos')
         observables['drawer1_handle_pos'] = observables.pop('drawer_handle_pos')
-        observables['coffee_pod1_pos'] = observables.pop('coffee_pod_pos')
-        observables['coffee_pod_holder1_pos'] = observables.pop('coffee_pod_holder_pos')
+        observables['coffee-pod1_pos'] = observables.pop('coffee_pod_pos')
+        observables['coffee-pod-holder1_pos'] = observables.pop('coffee_pod_holder_pos')
         observables['mug1_pos'] = observables.pop('mug_pos')
         observables['lid1_pos'] = observables.pop('coffee_machine_lid_pos')
         observables['table1_pos'] = observables.pop('table_pos')
@@ -1302,8 +1302,8 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         observables['gripper1_euler_angles'] = observables.pop('robot0_eef_euler_angles')
         observables['drawer1_cabinet_euler_angles'] = observables.pop('drawer_euler_angles')
         observables['drawer1_handle_euler_angles'] = observables.pop('drawer_handle_euler_angles')
-        observables['coffee_pod1_euler_angles'] = observables.pop('coffee_pod_euler_angles')
-        observables['coffee_pod_holder1_euler_angles'] = observables.pop('coffee_pod_holder_euler_angles')
+        observables['coffee-pod1_euler_angles'] = observables.pop('coffee_pod_euler_angles')
+        observables['coffee-pod_holder1_euler_angles'] = observables.pop('coffee_pod_holder_euler_angles')
         observables['mug1_euler_angles'] = observables.pop('mug_euler_angles')
         observables['lid1_euler_angles'] = observables.pop('coffee_machine_lid_euler_angles')
         observables['table1_euler_angles'] = observables.pop('table_euler_angles')
@@ -1419,19 +1419,19 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         def percent_overlap_of_coffee_pod1_with_drawer1(obs_cache):
             return np.array([coffee_pod1_drawer1_overlap])
         sensors += [percent_overlap_of_coffee_pod1_with_drawer1]
-        names += ["percent_overlap_of_coffee_pod1_with_drawer1"]
+        names += ["percent_overlap_of_coffee-pod1_with_drawer1"]
 
         @sensor(modality=modality)
         def percent_overlap_of_coffee_pod1_with_mug1(obs_cache):
             return np.array([coffee_pod1_mug1_overlap])
         sensors += [percent_overlap_of_coffee_pod1_with_mug1]
-        names += ["percent_overlap_of_coffee_pod1_with_mug1"]
+        names += ["percent_overlap_of_coffee-pod1_with_mug1"]
 
         @sensor(modality=modality)
         def percent_overlap_of_coffee_pod1_with_coffee_pod_holder1(obs_cache):
             return np.array([coffee_pod1_coffee_pod_holder1_overlap])
         sensors += [percent_overlap_of_coffee_pod1_with_coffee_pod_holder1]
-        names += ["percent_overlap_of_coffee_pod1_with_coffee_pod_holder1"]
+        names += ["percent_overlap_of_coffee-pod1_with_coffee_pod_holder1"]
 
         @sensor(modality=modality)
         def percent_overlap_of_coffee_machine_lid1_with_drawer1(obs_cache):
@@ -1497,7 +1497,7 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
             return True
         else:
             percent_overlap = self.estimate_obj1_overlap_w_obj2(obj_name, "drawer")
-            return percent_overlap > 0.5 # obj is considered in the drawer if 50% of it is inside the drawer 
+            return percent_overlap > 0.1 # obj is considered in the drawer if more than 10% of it is inside the drawer 
 
     
     def check_drawer_open(self):
