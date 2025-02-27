@@ -1506,7 +1506,7 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         """
         Returns true if drawer is open.
         """
-        return (self.sim.data.qpos[self.cabinet_qpos_addr] <= -0.19)
+        return (self.sim.data.qpos[self.cabinet_qpos_addr] <= -0.15)
     
     def check_drawer_open_percentage(self) -> float:
         """Returns how open the drawer is as a percentage.
@@ -1515,7 +1515,7 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
             float: Percentage of how open the drawer is (0.0 to 1.0).
         """
         closed_joint_angle = 0.0
-        open_joint_angle = -0.19
+        open_joint_angle = -0.15
         joint_angle_range = closed_joint_angle - open_joint_angle # 0.13
         joint_angle = self.sim.data.qpos[self.cabinet_qpos_addr] # might be more negative than -0.13
         if joint_angle < open_joint_angle:
