@@ -948,6 +948,9 @@ class MugCleanup(SingleArmEnv_MG):
         obj1_pos = self.sim.data.body_xpos[obj1_id]
         obj1_quat = self.sim.data.body_xquat[obj1_id]
         if obj1_name == "drawer":
+            drawer_id = self.sim.model.body_name2id("DrawerObject_drawer_link")
+            obj2_pos = self.sim.data.body_xpos[drawer_id]
+            obj2_quat = self.sim.data.body_xquat[drawer_id]
             XML_ASSETS_BASE_PATH = os.path.join(mimicgen.__path__[0], "models/robosuite/assets")
             xml_path = os.path.join(XML_ASSETS_BASE_PATH, "objects/drawer.xml")
             body_name = "drawer_link"  
@@ -962,6 +965,9 @@ class MugCleanup(SingleArmEnv_MG):
         obj2_pos = self.sim.data.body_xpos[obj2_id]
         obj2_quat = self.sim.data.body_xquat[obj2_id]
         if obj2_name == "drawer":
+            drawer_id = self.sim.model.body_name2id("DrawerObject_drawer_link")
+            obj2_pos = self.sim.data.body_xpos[drawer_id]
+            obj2_quat = self.sim.data.body_xquat[drawer_id]
             XML_ASSETS_BASE_PATH = os.path.join(mimicgen.__path__[0], "models/robosuite/assets")
             xml_path = os.path.join(XML_ASSETS_BASE_PATH, "objects/drawer.xml")
             body_name = "drawer_link"  
