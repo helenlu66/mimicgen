@@ -28,6 +28,7 @@ from robosuite_task_zoo.models.kitchen import PotObject, StoveObject, ButtonObje
 
 import mimicgen
 from mimicgen.envs.robosuite.single_arm_env_mg import SingleArmEnv_MG
+from mimicgen.models.robosuite.objects import BoxPatternObject
 
 
 class StoveObjectNew(StoveObject):
@@ -132,7 +133,7 @@ class Kitchen_D0(KitchenEnv, SingleArmEnv_MG):
         return KitchenEnv._get_observations(self, force_update=force_update)
 
 
-class Kitchen_D1(Kitchen_D0):
+class Kitchen_Switch_Novelty(Kitchen_D0):
     """
     Specify wider distribution for objects including objects that didn't move before. We also had to make some objects 
     movable that were fixtures before.
@@ -508,5 +509,282 @@ class Kitchen_D1(Kitchen_D0):
         """
         Update site visualization to make sure stove object site visualization is kept up to date.
         """
-        super(Kitchen_D1, self).visualize(vis_settings)
+        super(Kitchen_Switch_Novelty, self).visualize(vis_settings)
         self._post_process()
+    
+
+class Kitchen_Lid_Novelty(Kitchen_Switch_Novelty):
+    """
+    Specify wider distribution for objects including objects that didn't move before. We also had to make some objects 
+    movable that were fixtures before.
+    """
+
+    def _setup_references(self):
+        super()._setup_references()
+        self.obj_body_id['pot-lid'] = self.sim.model.body_name2id(self.piece_2.root_body)
+
+    def _get_initial_placement_bounds(self):
+        """
+        Internal function to get bounds for randomization of initial placements of objects (e.g.
+        what happens when env.reset is called). Should return a dictionary with the following
+        structure:
+            object_name
+                x: 2-tuple for low and high values for uniform sampling of x-position
+                y: 2-tuple for low and high values for uniform sampling of y-position
+                z_rot: 2-tuple for low and high values for uniform sampling of z-rotation
+                reference: np array of shape (3,) for reference position in world frame (assumed to be static and not change)
+        """
+        # Broader bounds for all objects.
+        bounds = super()._get_initial_placement_bounds()
+        bounds["piece_2"] = dict(
+            x=(-0.22, 0.22),
+            y=(-0.22, 0.22),
+            z_rot=(1.5708, 1.5708),
+            reference=self.table_offset,
+        )
+        return bounds
+
+    def _get_placement_initializer(self):
+        super()._get_placement_initializer()
+        bounds = self._get_initial_placement_bounds()
+
+        # lid
+        self.placement_initializer.append_sampler(
+            sampler=UniformRandomSampler(
+                name="ObjectSampler-pot-lid",
+                mujoco_objects=self.piece_2,
+                x_range=bounds["piece_2"]["x"],
+                y_range=bounds["piece_2"]["y"],
+                rotation=bounds["piece_2"]["z_rot"],
+                rotation_axis='z',
+                ensure_object_boundary_in_range=False,
+                ensure_valid_placement=True,
+                reference_pos=bounds["piece_2"]["reference"],
+                z_offset=0.001,
+            )
+        )
+
+    def _load_model(self):
+        """
+        Update to include fixtures that didn't move before in placement initializer, so
+        they can move on each episode reset. Also updates the list of objects so that
+        we get observables for the button.
+        """
+        SingleArmEnv._load_model(self)
+
+        # Adjust base pose accordingly
+        xpos = self.robots[0].robot_model.base_xpos_offset["table"](self.table_full_size[0])
+        self.robots[0].robot_model.set_base_xpos(xpos)
+
+        # load model for table top workspace
+        mujoco_arena = TableArena(
+            table_full_size=self.table_full_size,
+            table_offset=self.table_offset,
+            table_friction=(0.6, 0.005, 0.0001)
+        )
+
+        # Arena always gets set to zero origin
+        mujoco_arena.set_origin([0, 0, 0])
+
+        # Modify default agentview camera
+        mujoco_arena.set_camera(
+            camera_name="agentview",
+            pos=[0.5386131746834771, -4.392035683362857e-09, 1.4903500240372423],
+            quat=[0.6380177736282349, 0.3048497438430786, 0.30484986305236816, 0.6380177736282349]
+        )
+
+        mujoco_arena.set_camera(
+            camera_name="sideview",
+            pos=[0.5586131746834771, 0.3, 1.2903500240372423],
+            quat=[0.4144233167171478, 0.3100920617580414,
+            0.49641484022140503, 0.6968992352485657]
+        )
+        
+        
+        bread = CustomMaterial(
+            texture="Bread",
+            tex_name="bread",
+            mat_name="MatBread",
+            tex_attrib={"type": "cube"},
+            mat_attrib={"texrepeat": "3 3", "specular": "0.4","shininess": "0.1"}
+        )
+        darkwood = CustomMaterial(
+            texture="WoodDark",
+            tex_name="darkwood",
+            mat_name="MatDarkWood",
+            tex_attrib={"type": "cube"},
+            mat_attrib={"texrepeat": "3 3", "specular": "0.4","shininess": "0.1"}
+        )
+
+        metal = CustomMaterial(
+            texture="Metal",
+            tex_name="metal",
+            mat_name="MatMetal",
+            tex_attrib={"type": "cube"},
+            mat_attrib={"specular": "1", "shininess": "0.3", "rgba": "0.9 0.9 0.9 1"}
+        )
+
+        tex_attrib = {
+            "type": "cube"
+        }
+
+        mat_attrib = {
+            "texrepeat": "1 1",
+            "specular": "0.4",
+            "shininess": "0.1"
+        }
+        
+        greenwood = CustomMaterial(
+            texture="WoodGreen",
+            tex_name="greenwood",
+            mat_name="greenwood_mat",
+            tex_attrib=tex_attrib,
+            mat_attrib=mat_attrib,
+        )
+        redwood = CustomMaterial(
+            texture="WoodRed",
+            tex_name="redwood",
+            mat_name="MatRedWood",
+            tex_attrib=tex_attrib,
+            mat_attrib=mat_attrib,
+        )
+        
+        bluewood = CustomMaterial(
+            texture="WoodBlue",
+            tex_name="bluewood",
+            mat_name="handle1_mat",
+            tex_attrib={"type": "cube"},
+            mat_attrib={"texrepeat": "1 1", "specular": "0.4", "shininess": "0.1"},
+        )
+        
+        mat = CustomMaterial(
+            texture="WoodRed",
+            tex_name="redwood",
+            mat_name="redwood_mat",
+            tex_attrib={
+            "type": "cube",
+            },
+            mat_attrib={
+            "texrepeat": "1 1",
+            "specular": "0.4",
+            "shininess": "0.1",
+            },
+        )
+        self.piece_2_size = 0.02
+        self.piece_2_pattern = [[[1,1,1],[0,0,0],[1,1,1]],
+                [[1,1,1],[0,0,0],[1,1,1]],
+                [[1,1,1],[1,1,1],[1,1,1]],
+                [[0,0,0],[0,1,0],[0,0,0]]]
+        
+        self.piece_2 = BoxPatternObject(
+            name="piece_2",
+            unit_size=[self.piece_2_size, self.piece_2_size, self.piece_2_size],
+            pattern=self.piece_2_pattern,
+            rgba=None,
+            material=mat,
+            density=100,
+            friction=None,
+        )
+
+        self.stove_object_1 = StoveObjectNew(
+            name="Stove1",
+            joints=None,
+        )
+
+        # # old: manually set position in xml and add to mujoco arena
+        # stove_body = self.stove_object_1.get_obj()
+        # stove_body.set("pos", array_to_string((0.23, 0.095, 0.02)))
+        # mujoco_arena.table_body.append(stove_body)
+
+        self.button_object_1 = ButtonObjectNew(
+            name="Button1",
+        )
+
+        # # old: manually set position in xml and add to mujoco arena
+        # button_body = self.button_object_1.get_obj()
+        # button_body.set("quat", array_to_string((0., 0., 0., 1.)))
+        # button_body.set("pos", array_to_string((0.06, 0.10, 0.02)))
+        # mujoco_arena.table_body.append(button_body)
+
+        self.serving_region = ServingRegionObjectNew(
+            name="ServingRegionRed"
+        )
+
+        # # old: manually set position in xml and add to mujoco arena
+        # serving_region_object = self.serving_region.get_obj()
+        # serving_region_object.set("pos", array_to_string((0.345, -0.15, 0.003)))
+        # mujoco_arena.table_body.append(serving_region_object)
+        
+        self.pot_object = PotObject(
+            name="PotObject",
+        )
+        
+        for obj_body in [
+                self.button_object_1,
+                self.stove_object_1,
+                self.serving_region,
+        ]:
+            for material in [darkwood, metal, redwood]:
+                tex_element, mat_element, _, used = add_material(root=obj_body.worldbody,
+                                                                 naming_prefix=obj_body.naming_prefix,
+                                                                 custom_material=deepcopy(material))
+                obj_body.asset.append(tex_element)
+                obj_body.asset.append(mat_element)
+
+        ingredient_size = [0.015, 0.025, 0.02]
+
+        self.bread_ingredient = BoxObject(
+            name="cube_bread",
+            size_min=ingredient_size,
+            size_max=ingredient_size,
+            rgba=[1, 0, 0, 1],
+            material=bread,
+            density=500.,
+        )
+        
+        # make placement initializer
+        self._get_placement_initializer()
+        
+        mujoco_objects = [self.bread_ingredient,
+                          self.pot_object,
+                          self.stove_object_1,
+                          self.button_object_1,
+                          self.serving_region,
+                          self.piece_2
+        ]
+
+        # task includes arena, robot, and objects of interest
+        self.model = ManipulationTask(
+            mujoco_arena=mujoco_arena,
+            mujoco_robots=[robot.robot_model for robot in self.robots], 
+            mujoco_objects=mujoco_objects,
+        )
+        self.stoves = {1: self.stove_object_1,
+                       # 2: self.stove_object_2
+        }
+
+        self.num_stoves = len(self.stoves.keys())
+        
+        self.buttons = {1: self.button_object_1,
+                        # 2: self.button_object_2,
+        }
+
+        self.objects = [
+            self.stove_object_1,
+            self.bread_ingredient,
+            self.pot_object,
+            self.serving_region,
+            self.button_object_1,
+        ]
+        
+        self.model.merge_assets(self.button_object_1)
+        self.model.merge_assets(self.stove_object_1)
+        self.model.merge_assets(self.serving_region)
+
+        # hardcode some z-offsets here
+        self._hardcoded_z_offsets = {
+            self.stove_object_1.name : 0.895,
+            self.button_object_1.name : 0.895,
+            self.serving_region.name : 0.878,
+        }
+
