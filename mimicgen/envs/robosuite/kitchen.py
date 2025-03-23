@@ -529,6 +529,7 @@ class Kitchen_Lid_Novelty(Kitchen_Switch_Novelty):
     def _setup_references(self):
         super()._setup_references()
         self.obj_body_id['lid'] = self.sim.model.body_name2id(self.lid.root_body)
+    
 
     def _get_initial_placement_bounds(self):
         """
