@@ -54,7 +54,7 @@ class BoxPatternObject(CompositeObject):
         self._important_sites = {}
 
         # Create dictionary of values to create geoms for composite object and run super init
-        super().__init__(**self._get_geom_attrs())
+        super().__init__(solref=(0.01, 1.), solimp=(0.99, 0.99, 0.002), **self._get_geom_attrs())
 
         # Define materials we want to use for this object
         if self.material is not None:

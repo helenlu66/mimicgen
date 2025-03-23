@@ -178,6 +178,7 @@ class Kitchen_Switch_Novelty(Kitchen_D0):
         self.sim.data.qpos[self.button_qpos_addrs[1]] = -0.3
         for stove_num, stove_status in self.buttons_on.items():
             self.stoves[stove_num].set_sites_visibility(sim=self.sim, visible=stove_status)
+        self.sim.forward()
 
     def _get_initial_placement_bounds(self):
         """
@@ -193,33 +194,36 @@ class Kitchen_Switch_Novelty(Kitchen_D0):
         # Broader bounds for all objects.
         return dict(
             bread=dict(
-                x=(-0.2, 0.0),
+                x=(-0.3, -0.1),
                 y=(-0.25, -0.05),
                 # z_rot=(-np.pi / 2., -np.pi / 2.),
                 z_rot=(-np.pi / 2., np.pi / 2.),
                 reference=self.table_offset,
             ),
             pot=dict(
-                x=(0.08, 0.18),
-                y=(-0.2, -0.05),
+                # x=(0.08, 0.18),
+                # y=(-0.2, -0.05),
                 # z_rot=(-0.1, 0.1),
-                z_rot=(-np.pi / 6., np.pi / 6.),
+                # z_rot=(-np.pi / 6., np.pi / 6.),
+                x = (0.06, 0.11),
+                y = (-0.08, -0.05),
+                z_rot = (0, 0),
                 reference=self.table_offset,
             ),
             stove=dict(
-                x=(0.06, 0.23),
-                y=(0.095, 0.25),
+                x=(-0.04, 0.13),
+                y=(0.2, 0.25),
                 z_rot=(0., 0.),
                 reference=self.table_offset,
             ),
             button=dict(
-                x=(-0.2, 0.06),
-                y=(0.05, 0.2),
+                x=(-0.2, -0.04),
+                y=(0.1, 0.2),
                 z_rot=(np.pi, np.pi), # make z-rotation consistent with base env
                 reference=self.table_offset,
             ),
             serving_region=dict(
-                x=(0.345, 0.345),
+                x=(0.28, 0.28),
                 y=(-0.2, -0.05),
                 z_rot=(0., 0.),
                 reference=self.table_offset,
@@ -518,10 +522,13 @@ class Kitchen_Lid_Novelty(Kitchen_Switch_Novelty):
     Specify wider distribution for objects including objects that didn't move before. We also had to make some objects 
     movable that were fixtures before.
     """
+    def _reset_internal(self):
+        super()._reset_internal()
+        self._place_lid_on_pot()
 
     def _setup_references(self):
         super()._setup_references()
-        self.obj_body_id['pot-lid'] = self.sim.model.body_name2id(self.piece_2.root_body)
+        self.obj_body_id['lid'] = self.sim.model.body_name2id(self.lid.root_body)
 
     def _get_initial_placement_bounds(self):
         """
@@ -536,7 +543,7 @@ class Kitchen_Lid_Novelty(Kitchen_Switch_Novelty):
         """
         # Broader bounds for all objects.
         bounds = super()._get_initial_placement_bounds()
-        bounds["piece_2"] = dict(
+        bounds["lid"] = dict(
             x=(-0.22, 0.22),
             y=(-0.22, 0.22),
             z_rot=(1.5708, 1.5708),
@@ -551,15 +558,15 @@ class Kitchen_Lid_Novelty(Kitchen_Switch_Novelty):
         # lid
         self.placement_initializer.append_sampler(
             sampler=UniformRandomSampler(
-                name="ObjectSampler-pot-lid",
-                mujoco_objects=self.piece_2,
-                x_range=bounds["piece_2"]["x"],
-                y_range=bounds["piece_2"]["y"],
-                rotation=bounds["piece_2"]["z_rot"],
+                name="ObjectSampler-lid",
+                mujoco_objects=self.lid,
+                x_range=bounds["lid"]["x"],
+                y_range=bounds["lid"]["y"],
+                rotation=bounds["lid"]["z_rot"],
                 rotation_axis='z',
                 ensure_object_boundary_in_range=False,
                 ensure_valid_placement=True,
-                reference_pos=bounds["piece_2"]["reference"],
+                reference_pos=bounds["lid"]["reference"],
                 z_offset=0.001,
             )
         )
@@ -670,16 +677,20 @@ class Kitchen_Lid_Novelty(Kitchen_Switch_Novelty):
             "shininess": "0.1",
             },
         )
-        self.piece_2_size = 0.02
-        self.piece_2_pattern = [[[1,1,1],[0,0,0],[1,1,1]],
-                [[1,1,1],[0,0,0],[1,1,1]],
-                [[1,1,1],[1,1,1],[1,1,1]],
-                [[0,0,0],[0,1,0],[0,0,0]]]
-        
-        self.piece_2 = BoxPatternObject(
-            name="piece_2",
-            unit_size=[self.piece_2_size, self.piece_2_size, self.piece_2_size],
-            pattern=self.piece_2_pattern,
+        self.lid_size = 0.005
+        self.lid_pattern = [
+            [[1,1,1,1,1,1,1,1,1,1,1,1,1], [0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[1,1,1,1,1,1,1,1,1,1,1,1,1]],
+            [[1,1,1,1,1,1,1,1,1,1,1,1,1], [1,1,1,1,1,1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1,1,1,1,1,1]],
+            [[0,0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0]],
+            [[0,0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0]],
+            [[0,0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0]],
+            [[0,0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,1,1,1,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0]],
+            
+        ]
+        self.lid = BoxPatternObject(
+            name="lid",
+            unit_size=[self.lid_size, self.lid_size, self.lid_size],
+            pattern=self.lid_pattern,
             rgba=None,
             material=mat,
             density=100,
@@ -750,7 +761,7 @@ class Kitchen_Lid_Novelty(Kitchen_Switch_Novelty):
                           self.stove_object_1,
                           self.button_object_1,
                           self.serving_region,
-                          self.piece_2
+                          self.lid
         ]
 
         # task includes arena, robot, and objects of interest
@@ -775,6 +786,7 @@ class Kitchen_Lid_Novelty(Kitchen_Switch_Novelty):
             self.pot_object,
             self.serving_region,
             self.button_object_1,
+            self.lid
         ]
         
         self.model.merge_assets(self.button_object_1)
@@ -787,4 +799,15 @@ class Kitchen_Lid_Novelty(Kitchen_Switch_Novelty):
             self.button_object_1.name : 0.895,
             self.serving_region.name : 0.878,
         }
+
+    def _place_lid_on_pot(self):
+        """
+        Place the lid on the pot.
+        """
+        pot_pos = self.sim.data.body_xpos[self.pot_object_id]
+        pot_quat = T.convert_quat(self.sim.data.body_xquat[self.pot_object_id], to="xyzw")
+        lid_pos = pot_pos + np.array([0, 0, 0.1])
+        lid_quat = pot_quat
+        self.sim.data.set_joint_qpos(self.lid.joints[0], np.concatenate([lid_pos, lid_quat]))
+        self.sim.forward()
 
