@@ -528,7 +528,7 @@ class Kitchen_Lid_Novelty(Kitchen_Switch_Novelty):
 
     def _setup_references(self):
         super()._setup_references()
-        self.obj_body_id['lid'] = self.sim.model.body_name2id(self.lid.root_body)
+        self.obj_body_id['lid1'] = self.sim.model.body_name2id(self.lid.root_body)
     
 
     def _get_initial_placement_bounds(self):
@@ -571,6 +571,40 @@ class Kitchen_Lid_Novelty(Kitchen_Switch_Novelty):
                 z_offset=0.001,
             )
         )
+
+    def _setup_observables(self):
+        observables = super()._setup_observables()
+
+        handle_sensors = []
+        names = []
+        actives = []
+        @sensor(modality="object")
+        def lid_handle_pos(obs_cache):
+            lid_pos = self.sim.data.body_xpos[self.obj_body_id['lid1']]
+            # handle is just a bit above the lid
+            return np.copy(lid_pos) + np.array([0, 0, self.lid_size])
+        handle_sensors.append(lid_handle_pos)
+        names.append("lid1_handle_pos")
+        actives.append(True)
+
+        @sensor(modality="object")
+        def lid_handle_euler_angles(obs_cache):
+            # the same as the lid
+            return T.mat2euler(T.quat2mat(T.convert_quat(self.sim.data.body_xquat[self.obj_body_id['lid1']], to="xyzw")))
+        handle_sensors.append(lid_handle_euler_angles)
+        names.append("lid1_handle_euler_angles")
+        actives.append(True)
+
+        for name, s, active in zip(names, handle_sensors, actives):
+            observables[name] = Observable(
+                name=name,
+                sensor=s,
+                sampling_rate=self.control_freq,
+                enabled=True,
+                active=active,
+            )
+        return observables
+        
 
     def _load_model(self):
         """
@@ -689,7 +723,7 @@ class Kitchen_Lid_Novelty(Kitchen_Switch_Novelty):
             
         ]
         self.lid = BoxPatternObject(
-            name="lid",
+            name="lid1",
             unit_size=[self.lid_size, self.lid_size, self.lid_size],
             pattern=self.lid_pattern,
             rgba=None,
@@ -698,6 +732,7 @@ class Kitchen_Lid_Novelty(Kitchen_Switch_Novelty):
             friction=None,
         )
 
+        
         self.stove_object_1 = StoveObjectNew(
             name="Stove1",
             joints=None,
