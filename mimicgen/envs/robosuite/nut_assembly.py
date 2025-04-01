@@ -93,15 +93,15 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
                 z_rot: 2-tuple for low and high values for uniform sampling of z-rotation
                 reference: np array of shape (3,) for reference position in world frame (assumed to be static and not change)
         """
-        square_peg_x = 0.05
+        square_peg_x = -0.05
         square_peg_y = 0.1
-        round_peg_x = 0.05
+        round_peg_x = -0.05
         round_peg_y = -0.1
         return dict(
             square_nut=dict(
                 x=(round_peg_x, round_peg_x),
                 y=(round_peg_y, round_peg_y),
-                z_rot=(11*np.pi/12, 13*np.pi/12),
+                z_rot=(47*np.pi/48, 49*np.pi/48),
                 reference=np.array((0, 0, 0.82)),
             ),
             round_nut=dict(
