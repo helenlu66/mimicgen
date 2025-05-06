@@ -498,8 +498,8 @@ class Coffee_Pre_Novelty(SingleArmEnv_MG):
             return obs_cache[f"{obj_name}_to_{pf}eef_quat"] if \
                 f"{obj_name}_to_{pf}eef_quat" in obs_cache else np.zeros(4)
 
-        sensors = [obj_pos, obj_euler_angles]
-        names = [f"{obj_name}_pos", f"{obj_name}_euler_angles"]
+        sensors = [obj_to_eef_pos]
+        names = [f"{obj_name}_to_{pf}eef_pos"]
 
         return sensors, names
 
@@ -1291,26 +1291,39 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
         """
         Make copies of the observables with names that match the planning domain.
         """
-        # Positions of objects
+        # Positions of objects relative to the eef
+        observables['drawer1_cabinet_to_gripper1_pos'] = observables.pop('drawer_to_robot0_eef_pos')
+        observables['drawer1_handle_to_gripper1_pos'] = observables.pop('drawer_handle_to_robot0_eef_pos')
+        observables['coffee-pod1_to_gripper1_pos'] = observables.pop('coffee_pod_to_robot0_eef_pos')
+        observables['coffee-pod-holder1_to_gripper1_pos'] = observables.pop('coffee_pod_holder_to_robot0_eef_pos')
+        observables['mug1_to_gripper1_pos'] = observables.pop('mug_to_robot0_eef_pos')
+        observables['lid1_to_gripper1_pos'] = observables.pop('coffee_machine_lid_to_robot0_eef_pos')
+        observables['table1_center_to_gripper1_pos'] = observables.pop('table_center_to_robot0_eef_pos')
+
+        # Positions of the eef
         observables['gripper1_pos'] = observables.pop('robot0_eef_pos')
         observables['griper1_fingers_qpos'] = observables.pop('robot0_gripper_fingers_qpos')
-        observables['drawer1_cabinet_pos'] = observables.pop('drawer_pos')
-        observables['drawer1_handle_pos'] = observables.pop('drawer_handle_pos')
-        observables['coffee-pod1_pos'] = observables.pop('coffee_pod_pos')
-        observables['coffee-pod-holder1_pos'] = observables.pop('coffee_pod_holder_pos')
-        observables['mug1_pos'] = observables.pop('mug_pos')
-        observables['lid1_pos'] = observables.pop('coffee_machine_lid_pos')
-        observables['table1_pos'] = observables.pop('table_pos')
         
-        # Orientations of objects
-        observables['gripper1_euler_angles'] = observables.pop('robot0_eef_euler_angles')
-        observables['drawer1_cabinet_euler_angles'] = observables.pop('drawer_euler_angles')
-        observables['drawer1_handle_euler_angles'] = observables.pop('drawer_handle_euler_angles')
-        observables['coffee-pod1_euler_angles'] = observables.pop('coffee_pod_euler_angles')
-        observables['coffee-pod_holder1_euler_angles'] = observables.pop('coffee_pod_holder_euler_angles')
-        observables['mug1_euler_angles'] = observables.pop('mug_euler_angles')
-        observables['lid1_euler_angles'] = observables.pop('coffee_machine_lid_euler_angles')
-        observables['table1_euler_angles'] = observables.pop('table_euler_angles')
+        # # Positions of objects
+        # observables['gripper1_pos'] = observables.pop('robot0_eef_pos')
+        # observables['griper1_fingers_qpos'] = observables.pop('robot0_gripper_fingers_qpos')
+        # observables['drawer1_cabinet_pos'] = observables.pop('drawer_pos')
+        # observables['drawer1_handle_pos'] = observables.pop('drawer_handle_pos')
+        # observables['coffee-pod1_pos'] = observables.pop('coffee_pod_pos')
+        # observables['coffee-pod-holder1_pos'] = observables.pop('coffee_pod_holder_pos')
+        # observables['mug1_pos'] = observables.pop('mug_pos')
+        # observables['lid1_pos'] = observables.pop('coffee_machine_lid_pos')
+        # observables['table1_pos'] = observables.pop('table_pos')
+        
+        # # Orientations of objects
+        # observables['gripper1_euler_angles'] = observables.pop('robot0_eef_euler_angles')
+        # observables['drawer1_cabinet_euler_angles'] = observables.pop('drawer_euler_angles')
+        # observables['drawer1_handle_euler_angles'] = observables.pop('drawer_handle_euler_angles')
+        # observables['coffee-pod1_euler_angles'] = observables.pop('coffee_pod_euler_angles')
+        # observables['coffee-pod_holder1_euler_angles'] = observables.pop('coffee_pod_holder_euler_angles')
+        # observables['mug1_euler_angles'] = observables.pop('mug_euler_angles')
+        # observables['lid1_euler_angles'] = observables.pop('coffee_machine_lid_euler_angles')
+        # observables['table1_euler_angles'] = observables.pop('table_euler_angles')
 
 
         return observables
@@ -1325,6 +1338,7 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
 
         # super class will populate observables for "mug" and "drawer" poses in addition to coffee machine and coffee pod
         observables = super()._setup_observables()
+        pf = self.robots[0].robot_model.naming_prefix
 
         if self.use_object_obs:
             modality = "object"
@@ -1333,38 +1347,60 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
             @sensor(modality=modality)
             def drawer_joint_angle(obs_cache):
                 return np.array([self.sim.data.qpos[self.cabinet_qpos_addr]])
-            sensors = [drawer_joint_angle]
-            names = ["drawer_joint_angle"]
-            actives = [False]
 
             @sensor(modality=modality)
             def drawer_handle_pos(obs_cache):
                 return np.array(self.sim.data.geom_xpos[self.drawer_handle_mid_geom_id])
-            sensors += [drawer_handle_pos]
-            names += ["drawer_handle_pos"]
-            actives += [True]
+
+
+            # relative position of drawer handle
+            @sensor(modality=modality)
+            def drawer_handle_to_eef_pos(obs_cache):
+                # Immediately return default value if cache is empty
+                if "world_pose_in_gripper" not in obs_cache:
+                    return np.zeros(3)
+                drawer_handle_pos = np.array(self.sim.data.geom_xpos[self.drawer_handle_mid_geom_id])
+                drawer_handle_quat = np.array(self.sim.data.geom_xmat[self.drawer_handle_mid_geom_id])
+                drawer_handle_pose = T.pose2mat((drawer_handle_pos, drawer_handle_quat))
+                rel_pose = T.pose_in_A_to_pose_in_B(drawer_handle_pose, obs_cache["world_pose_in_gripper"])
+                rel_pos, rel_quat = T.mat2pose(rel_pose)
+                obs_cache[f"drawer_handle_to_{pf}eef_quat"] = rel_quat
+                obs_cache[f"drawer_handle_to_{pf}eef_pos"] = rel_pos
+                return rel_pos
+
 
             @sensor(modality=modality)
             def drawer_handle_euler_angles(obs_cache):
                 return T.mat2euler(T.quat2mat(self.sim.data.geom_xmat[self.drawer_handle_mid_geom_id]).reshape(3, 3))
-            sensors += [drawer_handle_euler_angles]
-            names += ["drawer_handle_euler_angles"]
-            actives += [True]
+
 
             @sensor(modality=modality)
             def table_pos(obs_cache):
                 return np.array(self.table_offset)
-            sensors += [table_pos]
-            names += ["table_pos"]
-            actives += [True]
+            
+            @sensor(modality=modality)
+            def table_center_to_eef_pos(obs_cache):
+                # Immediately return default value if cache is empty
+                if "world_pose_in_gripper" not in obs_cache:
+                    return np.zeros(3)
+                table_pos = np.array(self.table_offset)
+                table_quat = np.array([0, 0, 0, 1])
+                table_pose = T.pose2mat((table_pos, table_quat))
+                rel_pose = T.pose_in_A_to_pose_in_B(table_pose, obs_cache["world_pose_in_gripper"])
+                rel_pos, rel_quat = T.mat2pose(rel_pose)
+                obs_cache[f"table_center_to_{pf}eef_quat"] = rel_quat
+                obs_cache[f"table_center_to_{pf}eef_pos"] = rel_pos
+                return rel_pos
+
 
             @sensor(modality=modality)
             def table_euler_angles(obs_cache):
                 return np.array([0, 0, 0])
-            sensors += [table_euler_angles]
-            names += ["table_euler_angles"]
-            actives += [True]
 
+
+            names = [f"drawer_handle_to_{pf}eef_pos", f"table_center_to_{pf}eef_pos"]
+            sensors = [drawer_handle_to_eef_pos, table_center_to_eef_pos]
+            actives = [True, True]
 
             # Create observables
             for name, s, active in zip(names, sensors, actives):
