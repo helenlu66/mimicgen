@@ -1032,7 +1032,7 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
                 # y=(0.3, 0.3),
                 # z_rot=(0.0, 0.0),
                 # x=(0.15, 0.15),
-                x=(0.00, 0.00),
+                x=(-0.02, -0.02),
                 y=(-0.35, -0.35),
                 z_rot=(np.pi, np.pi),
                 reference=self.table_offset,
@@ -1303,6 +1303,7 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
 
         # Positions of the eef
         observables['gripper1_pos'] = observables.pop('robot0_eef_pos')
+        observables['gripper1_aperture'] = observables.pop('robot0_gripper_aperture')
         observables['griper1_fingers_qpos'] = observables.pop('robot0_gripper_fingers_qpos')
         
         # # Positions of objects
