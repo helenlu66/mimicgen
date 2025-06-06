@@ -234,7 +234,8 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
         
         # Positions of gripper
         observables['gripper1_pos'] = observables.pop('robot0_eef_pos')
-        observables['gripper1_fingers_qpos'] = observables.pop('robot0_gripper_fingers_qpos')
+        observables['gripper1_aperture'] = observables.pop('robot0_gripper_aperture')
+        observables['griper1_fingers_qpos'] = observables.pop('robot0_gripper_fingers_qpos')
 
         # Positions of objects
         # observables['gripper1_pos'] = observables.pop('robot0_eef_pos')
