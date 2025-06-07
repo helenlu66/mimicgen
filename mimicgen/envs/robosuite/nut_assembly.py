@@ -490,7 +490,7 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
                 return bottom_of_round_nut[2] - bottom_of_round_peg1
 
             # include only the two relative pos
-            names += ["square_peg1_to_gripper1_pos", "round_peg1_to_gripper1_pos"]
+            names += ["square-peg1_to_gripper1_pos", "round-peg1_to_gripper1_pos"]
             sensors += [square_peg1_to_gripper1_pos, round_peg1_to_gripper1_pos]
             actives += [True, True]
 
