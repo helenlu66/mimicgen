@@ -585,17 +585,30 @@ class Kitchen_Lid_Novelty(Kitchen_Switch_Pre_Novelty):
             lid_pos = self.sim.data.body_xpos[self.obj_body_id['lid1']]
             # handle is just a bit above the lid
             return np.copy(lid_pos) + np.array([0, 0, self.lid_size])
-        handle_sensors.append(lid_handle_pos)
-        names.append("lid1_handle_pos")
-        actives.append(True)
 
         @sensor(modality="object")
         def lid_handle_euler_angles(obs_cache):
             # the same as the lid
             return T.mat2euler(T.quat2mat(T.convert_quat(self.sim.data.body_xquat[self.obj_body_id['lid1']], to="xyzw")))
-        handle_sensors.append(lid_handle_euler_angles)
-        #names.append("lid1_handle_euler_angles")
-        #actives.append(True)
+
+
+        @sensor(modality='object')
+        def lid1_handle_to_gripper1_pos(obs_cache):
+            # Immediately return default value if cache is empty
+            if "world_pose_in_gripper" not in obs_cache:
+                return np.zeros(3)
+            lid_handle_pos = np.copy(self.sim.data.body_xpos[self.obj_body_id['lid1']]) + np.array([0, 0, self.lid_size])
+            lid_handle_quat = self.sim.data.body_xquat[self.obj_body_id['lid1']]
+
+            lid_handle_pose = T.pose2mat((lid_handle_pos, lid_handle_quat))
+            rel_pose = T.pose_in_A_to_pose_in_B(lid_handle_pose, obs_cache["world_pose_in_gripper"])
+            rel_pos, rel_quat = T.mat2pose(rel_pose)
+            obs_cache[f"lid1_handle_to_gripper1_quat"] = rel_quat
+            return rel_pos
+        
+        handle_sensors = [lid1_handle_to_gripper1_pos]
+        names = ['lid1_handle_to_gripper1_pos']
+        actives = [True]
 
         for name, s, active in zip(names, handle_sensors, actives):
             observables[name] = Observable(
