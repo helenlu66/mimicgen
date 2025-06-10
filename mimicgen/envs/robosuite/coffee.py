@@ -1562,7 +1562,7 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
             return 1.0
         elif joint_angle > closed_joint_angle:
             return 0.0
-        return (joint_angle - open_joint_angle) / joint_angle_range
+        return -(open_joint_angle - joint_angle) / joint_angle_range
 
     
     def check_mug_upright(self):

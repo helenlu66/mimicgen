@@ -95,10 +95,21 @@ if __name__ == "__main__":
 
     # Get action limits
     low, high = env.action_spec
+    print("Action low limits:", low)
+    print("Action high limits:", high)
 
     # do visualization
+    prev_obs = env.reset()
+    sum_displacement = 0
     for i in range(10000):
         action = np.random.uniform(low, high)
-        obs, reward, done, _ = env.step(action)
+        curr_obs, reward, done, _ = env.step(action)
+        displacement = np.linalg.norm(curr_obs['gripper1_pos'] - prev_obs['gripper1_pos'])
+        sum_displacement += displacement
+        print("Action:", action)
+        print("Displacement:", displacement)
+        prev_obs = curr_obs
         #detector.exclusively_occupying_gripper('coffee_pod')
         env.render()
+    print("Total displacement:", sum_displacement)
+    print("Average displacement per step:", sum_displacement / 10000)
