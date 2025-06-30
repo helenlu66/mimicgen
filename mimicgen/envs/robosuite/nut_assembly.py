@@ -329,9 +329,6 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
                             smallest_dist = self.sim.model.geom_dists[robot_geom][obj_geom_name]['dist']
                             closest_point = self.sim.model.geom_dists[robot_geom][obj_geom_name]['closest_point']
                 return [smallest_dist] + list(closest_point)
-            sensors = [robot_body_to_peg_collision_dist]
-            names = ["robot_body_to_square-peg1_collision_dist"]
-            actives = [False]
 
             @sensor(modality='object_collision')
             def robot_body_to_table_collision_dist(obs_cache):
@@ -346,9 +343,6 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
                             smallest_dist = self.sim.model.geom_dists[robot_geom][obj_geom_name]['dist']
                             closest_point = self.sim.model.geom_dists[robot_geom][obj_geom_name]['closest_point']
                 return [smallest_dist] + list(closest_point)
-            sensors += [robot_body_to_table_collision_dist]
-            names += ["robot_body_to_table1_collision_dist"]
-            actives += [False]
 
             @sensor(modality='object_collision')
             def robot_body_to_square_nut_collision_dist(obs_cache):
@@ -363,9 +357,6 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
                             smallest_dist = self.sim.model.geom_dists[robot_geom][obj_geom_name]['dist']
                             closest_point = self.sim.model.geom_dists[robot_geom][obj_geom_name]['closest_point']
                 return [smallest_dist] + list(closest_point)
-            sensors += [robot_body_to_square_nut_collision_dist]
-            names += ["robot_body_to_square-nut1_collision_dist"]
-            actives += [False]
 
             @sensor(modality='object_collision')
             def robot_body_to_round_nut_collision_dist(obs_cache):
