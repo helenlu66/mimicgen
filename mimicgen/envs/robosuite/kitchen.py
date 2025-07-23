@@ -526,7 +526,7 @@ class Kitchen_Lid_Novelty(Kitchen_Switch_Pre_Novelty):
     """
     def _reset_internal(self):
         super()._reset_internal()
-        self._place_lid_on_pot()
+        self._place_pot_on_stove()
 
     def _setup_references(self):
         super()._setup_references()
