@@ -2066,8 +2066,8 @@ class Coffee_Box_Novelty(Coffee_Pre_Novelty):
                 reference=self.table_offset,
             ),
             box=dict(
-                x=(0.025, 0.075),
-                y=(-0.025, 0.025),
+                x=(-0.025, 0.00),
+                y=(-0.01, 0.01),
                 z_rot=(np.pi, np.pi),
                 reference=self.table_offset,
             ),
