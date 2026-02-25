@@ -21,6 +21,7 @@ import mimicgen
 import xml.etree.ElementTree as ET
 from mimicgen.models.robosuite.objects import BlenderObject, CoffeeMachinePodObject, CoffeeMachineObject, LongDrawerObject, CupObject
 from mimicgen.envs.robosuite.single_arm_env_mg import SingleArmEnv_MG
+from mimicgen.models.robosuite.objects import BoxPatternObject
 
 
 class Coffee_Pre_Novelty(SingleArmEnv_MG):
@@ -880,10 +881,9 @@ class Coffee_D2(Coffee_D1):
             ),
         )
 
-
 class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
     """
-    Harder coffee task where the task starts with materials in drawer and coffee machine closed. The robot
+    Harder coffee task where the task starts with the coffee pod in drawer and coffee machine closed. The robot
     needs to retrieve the coffee pod and mug from the drawer, open the coffee machine, place the pod and mug 
     in the machine, and then close the lid.
     """
@@ -1817,6 +1817,644 @@ class Coffee_Drawer_Novelty(Coffee_Pre_Novelty):
 
         return metrics
 
+
+class Coffee_Box_Novelty(Coffee_Pre_Novelty):
+    """
+    Hander coffee task where the task starts with the coffee pod in a box. The robot needs to reach inside the box, retrieve the coffee pod, open the coffee machine, place the pod in the machine, and then close the lid.
+    """
+    def _get_mug_model(self):
+        """
+        Allow subclasses to override which mug to use.
+        """
+        shapenet_id = "3143a4ac"  # beige round mug, works well and matches color scheme of other assets
+        shapenet_scale = 1.0
+        base_mjcf_path = os.path.join(mimicgen.__path__[0], "models/robosuite/assets/shapenet_core/mugs")
+        mjcf_path = os.path.join(base_mjcf_path, "{}/model.xml".format(shapenet_id))
+
+        self.mug = BlenderObject(
+            name="mug",
+            mjcf_path=mjcf_path,
+            scale=shapenet_scale,
+            solimp=(0.998, 0.998, 0.001),
+            solref=(0.001, 1),
+            density=100,
+            friction=(1, 1, 1),
+            margin=0.001,
+        )
+    def _setup_references(self):
+        """
+        Sets up references to important components. A reference is typically an
+        index or a list of indices that point to the corresponding elements
+        in a flatten array, which is how MuJoCo stores physical simulation data.
+        """
+        super()._setup_references()
+        # Set up mug reference
+        self.obj_body_id["mug"] = self.sim.model.body_name2id(self.mug.root_body)
+        # Set up box reference
+        self.obj_body_id["box"] = self.sim.model.body_name2id(self.box.root_body)
+
+    def _load_model(self):
+        SingleArmEnv._load_model(self)
+
+        # Adjust base pose accordingly
+        xpos = self.robots[0].robot_model.base_xpos_offset["table"](self.table_full_size[0])
+        self.robots[0].robot_model.set_base_xpos(xpos)
+
+        # load model for table top workspace
+        mujoco_arena = TableArena(
+            table_full_size=self.table_full_size,
+            table_friction=self.table_friction,
+            table_offset=self.table_offset,
+        )
+
+        # Arena always gets set to zero origin
+        mujoco_arena.set_origin([0, 0, 0])
+
+        # Add camera with full tabletop perspective
+        self._add_agentview_full_camera(mujoco_arena)
+
+        # Set default agentview camera to be "agentview_full" (and send old agentview camera to agentview_full)
+        old_agentview_camera = find_elements(root=mujoco_arena.worldbody, tags="camera", attribs={"name": "agentview"}, return_first=True)
+        old_agentview_camera_pose = (old_agentview_camera.get("pos"), old_agentview_camera.get("quat"))
+        old_agentview_full_camera = find_elements(root=mujoco_arena.worldbody, tags="camera", attribs={"name": "agentview_full"}, return_first=True)
+        old_agentview_full_camera_pose = (old_agentview_full_camera.get("pos"), old_agentview_full_camera.get("quat"))
+        mujoco_arena.set_camera(
+            camera_name="agentview",
+            pos=string_to_array(old_agentview_full_camera_pose[0]),
+            quat=string_to_array(old_agentview_full_camera_pose[1]),
+        )
+        mujoco_arena.set_camera(
+            camera_name="agentview_full",
+            pos=string_to_array(old_agentview_camera_pose[0]),
+            quat=string_to_array(old_agentview_camera_pose[1]),
+        )
+
+        # Create box object
+        tex_attrib = {
+            "type": "cube"
+        }
+        mat_attrib = {
+            "texrepeat": "1 1",
+            "specular": "0.4",
+            "shininess": "0.1"
+        }
+        redwood = CustomMaterial(
+            texture="WoodRed",
+            tex_name="redwood",
+            mat_name="MatRedWood",
+            tex_attrib=tex_attrib,
+            mat_attrib=mat_attrib,
+        )
+        self.box_unit_size = 0.008
+        self.box_pattern = [
+            # bottom (19x19)
+            [
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            ],
+            # walls (layer 1)
+            [
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            ],
+            # walls (layer 2)
+            [
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            ],
+            # walls (layer 3)
+            [
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            ],
+            # walls (layer 4)
+            [
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            ],
+        ]
+        self.box = BoxPatternObject(
+            name="box",
+            unit_size=[self.box_unit_size, self.box_unit_size, self.box_unit_size],
+            pattern=self.box_pattern,
+            rgba=None,
+            material=redwood,
+            density=100,
+            friction=(1.0, 0.005, 0.0001),
+        )
+
+        # Create mug
+        self._get_mug_model()
+
+        # initialize objects of interest
+        self.coffee_pod = CoffeeMachinePodObject(name="coffee_pod")
+        self.coffee_machine = CoffeeMachineObject(name="coffee_machine", add_cup=False)
+        self.coffee_machine_lid = self.coffee_machine.lid
+        self.coffee_pod_holder = self.coffee_machine.pod_holder
+
+        # Create placement initializer
+        self._get_placement_initializer()
+
+        # task includes arena, robot, and objects of interest
+        self.model = ManipulationTask(
+            mujoco_arena=mujoco_arena,
+            mujoco_robots=[robot.robot_model for robot in self.robots],
+            mujoco_objects=[self.coffee_pod, self.coffee_machine, self.box],
+        )
+
+        # HACK: merge in mug afterwards because its number of geoms may change
+        #       and this may break the generate_id_mappings function in task.py
+        self.model.merge_objects([self.mug])
+
+    def _get_initial_placement_bounds(self):
+        # Box is 13x13 units, each 0.008m, so inner wall-to-wall is 0.096m. To ensure 2.5cm margin plus pod half-width:
+        half_inner = 0.048  # half of 0.096m
+        pod_half_width = self.coffee_pod.get_bounding_box_half_size()[0]
+        margin = 0.025 + pod_half_width  # 2.5 cm + pod half-width
+        pod_min = -half_inner + margin
+        pod_max = half_inner - margin
+        bounds = dict(
+            coffee_machine=dict(
+                x=(-0.3, -0.3),
+                y=(-0.22, -0.22),
+                z_rot=(0, 0),
+                reference=self.table_offset,
+            ),
+            box=dict(
+                x=(0.025, 0.075),
+                y=(-0.025, 0.025),
+                z_rot=(np.pi, np.pi),
+                reference=self.table_offset,
+            ),
+            mug=dict(
+                x=(-0.275, -0.275),
+                y=(-0.095, -0.095),
+                z_rot=(0.0, 0.0),
+                reference=self.table_offset,
+            ),
+        )
+        # Make pod reference the box's reference
+        bounds['coffee_pod'] = dict(
+            x=(pod_min, pod_max),
+            y=(pod_min, pod_max),
+            z_rot=(0.0, 0.0),
+            reference=bounds['box']['reference'],
+        )
+        return bounds
+
+    def _get_placement_initializer(self):
+        bounds = self._get_initial_placement_bounds()
+
+        self.placement_initializer = SequentialCompositeSampler(name="ObjectSampler")
+        self.placement_initializer.append_sampler(
+            sampler=UniformRandomSampler(
+                name="CoffeeMachineSampler",
+                mujoco_objects=self.coffee_machine,
+                x_range=bounds["coffee_machine"]["x"],
+                y_range=bounds["coffee_machine"]["y"],
+                rotation=bounds["coffee_machine"]["z_rot"],
+                rotation_axis='z',
+                ensure_object_boundary_in_range=False,
+                ensure_valid_placement=True,
+                reference_pos=bounds["coffee_machine"]["reference"],
+                z_offset=0.,
+            )
+        )
+        self.placement_initializer.append_sampler(
+            sampler=UniformRandomSampler(
+                name="BoxSampler",
+                mujoco_objects=self.box,
+                x_range=bounds["box"]["x"],
+                y_range=bounds["box"]["y"],
+                rotation=bounds["box"]["z_rot"],
+                rotation_axis='z',
+                ensure_object_boundary_in_range=False,
+                ensure_valid_placement=True,
+                reference_pos=bounds["box"]["reference"],
+                z_offset=0.,
+            )
+        )
+        self.placement_initializer.append_sampler(
+            sampler=UniformRandomSampler(
+                name="MugSampler",
+                mujoco_objects=self.mug,
+                x_range=bounds["mug"]["x"],
+                y_range=bounds["mug"]["y"],
+                rotation=bounds["mug"]["z_rot"],
+                rotation_axis='z',
+                ensure_object_boundary_in_range=False,
+                ensure_valid_placement=False,
+                reference_pos=bounds["mug"]["reference"],
+                z_offset=0.01,
+            )
+        )
+
+        # Coffee pod gets its own placement sampler to sample within the box.
+        self.pod_placement_initializer = UniformRandomSampler(
+            name="CoffeePodInBoxSampler",
+            mujoco_objects=self.coffee_pod,
+            x_range=bounds["coffee_pod"]["x"],
+            y_range=bounds["coffee_pod"]["y"],
+            rotation=bounds["coffee_pod"]["z_rot"],
+            rotation_axis='z',
+            ensure_object_boundary_in_range=False,
+            ensure_valid_placement=True,
+            reference_pos=bounds["coffee_pod"]["reference"],
+            z_offset=0.,
+        )
+
+    def _reset_internal(self):
+    
+        SingleArmEnv._reset_internal(self)
+
+        # Reset all object positions using initializer sampler if we're not directly loading from an xml
+        if not self.deterministic_reset:
+            # Sample from the placement initializer for all objects
+            object_placements = self.placement_initializer.sample()
+
+            # Loop through all objects and reset their positions
+            for obj_pos, obj_quat, obj in object_placements.values():
+                self.sim.data.set_joint_qpos(obj.joints[0], np.concatenate([np.array(obj_pos), np.array(obj_quat)]))
+
+        # Hinge for coffee machine starts closed
+        self.sim.data.qpos[self.hinge_qpos_addr] = 0.
+        self.sim.forward()
+
+        if not self.deterministic_reset:
+            # sample pod location relative to box frame
+            coffee_pod_placement = self.pod_placement_initializer.sample(on_top=False)
+            assert len(coffee_pod_placement) == 1
+            rel_pod_pos, rel_pod_quat, pod_obj = list(coffee_pod_placement.values())[0]
+            rel_pod_pos, rel_pod_quat = np.array(rel_pod_pos), np.array(rel_pod_quat)
+            assert pod_obj is self.coffee_pod
+
+            box_body_id = self.sim.model.body_name2id(self.box.root_body)
+            box_pos = np.array(self.sim.data.body_xpos[box_body_id])
+            box_rot_mat = T.quat2mat(T.convert_quat(self.sim.model.body_quat[box_body_id], to="xyzw"))
+
+            # convert relative position and rotation to world frame
+            rel_pod_pos[:2] = box_rot_mat[:2, :2].dot(rel_pod_pos[:2])
+            rel_pod_mat = T.quat2mat(T.convert_quat(rel_pod_quat, to="xyzw"))
+            pod_mat = box_rot_mat.dot(rel_pod_mat)
+            pod_quat = T.convert_quat(T.mat2quat(pod_mat), to="wxyz")
+
+            # place pod on box bottom surface
+            box_bottom_z = box_pos[2] - self.box.total_size[2]
+            box_floor_thickness = 2.0 * self.box_unit_size
+            coffee_pod_bottom_offset = np.abs(self.coffee_pod.bottom_offset[-1])
+            pod_pos = np.array(box_pos) + rel_pod_pos
+            pod_pos[-1] = box_bottom_z + box_floor_thickness + coffee_pod_bottom_offset + 0.001
+
+            self.sim.data.set_joint_qpos(pod_obj.joints[0], np.concatenate([np.array(pod_pos), np.array(pod_quat)]))
+
+    def check_in_box(self, obj_name):
+        """Check if the object is in tbe box. We can return True if the pod is further than certain distance away from the box. 
+
+        Returns:
+            bool: whether pod is in box or not
+        """
+        obj_name = obj_name.replace('-', '_')
+        obj_pos = np.array(self.sim.data.body_xpos[self.obj_body_id[obj_name]])
+        box_pos = np.array(self.sim.data.body_xpos[self.obj_body_id["box"]])
+        dist = np.linalg.norm(obj_pos - box_pos)
+        return dist < 0.10
+    
+
+    def check_can_flip_up_lid(self):
+        """
+        Returns True if the coffee pod lid can be flipped up.
+        """
+        hinge_tolerance = 90. * np.pi / 180.
+        hinge_angle = self.sim.data.qpos[self.hinge_qpos_addr]
+        lid_check = (hinge_angle < hinge_tolerance)
+        return lid_check
+
+    def check_directly_on_table(self, obj_name):
+        """
+        Returns True if the object is directly on the table.
+        """
+        obj_name = obj_name.replace('-', '_')
+        obj = getattr(self, obj_name)
+        return self.check_contact(obj, 'table_collision')
+
+
+    def check_in_mug(self, obj_name):
+        obj_name = obj_name.replace('-', '_')
+        if obj_name != 'coffee_pod':
+            return False
+        percent_overlap = self.estimate_obj1_overlap_w_obj2(obj_name, "mug")
+        return percent_overlap > 0.5
+
+    def check_mug_upright(self):
+        mug_euler_angles = T.mat2euler(T.quat2mat(T.convert_quat(self.sim.data.body_xquat[self.obj_body_id["mug"]], to="xyzw")))
+        return np.all(np.abs(mug_euler_angles[:2]) < np.pi/4)
+
+    def check_mug_under_pod_holder(self):
+        coffee_base_plate_geom = "coffee_machine_base_g0"
+        mug_on_machine = self.check_contact(coffee_base_plate_geom, self.mug)
+        return mug_on_machine
+
+    def check_mug_placement(self):
+        """
+        Returns true if mug has been placed successfully on the coffee machine.
+        """
+
+        # check z-axis alignment by checking z unit-vector of obj pose and dot with (0, 0, 1)
+        # then take cosine dist (1 - dot-prod)
+        mug_upright = self.check_mug_upright()
+
+        # to check if mug is placed on the machine successfully, we check that the mug is upright, and that it is
+        # making contact with the coffee machine base plate
+        mug_on_machine = self.check_mug_under_pod_holder()
+
+        return mug_upright and mug_on_machine
+
+    def check_pod_in_box(self):
+        pod_pos = np.array(self.sim.data.body_xpos[self.obj_body_id["coffee_pod"]])
+        box_pos = np.array(self.sim.data.body_xpos[self.obj_body_id["box"]])
+        dist = np.linalg.norm(pod_pos - box_pos)
+        return dist < 0.10
+    
+    def rename_observables(self, observables):
+            """
+            Make copies of the observables with names that match the planning domain.
+            """
+            # Positions of objects relative to the eef
+            observables['box1_to_gripper1_pos'] = observables.pop('box_to_robot0_eef_pos')
+            observables['coffee-pod1_to_gripper1_pos'] = observables.pop('coffee_pod_to_robot0_eef_pos')
+            observables['coffee-pod-holder1_to_gripper1_pos'] = observables.pop('coffee_pod_holder_to_robot0_eef_pos')
+            observables['mug1_to_gripper1_pos'] = observables.pop('mug_to_robot0_eef_pos')
+            observables['lid1_to_gripper1_pos'] = observables.pop('coffee_machine_lid_to_robot0_eef_pos')
+            observables['table1_center_to_gripper1_pos'] = observables.pop('table_center_to_robot0_eef_pos')
+
+            # Positions of the eef
+            observables['gripper1_pos'] = observables.pop('robot0_eef_pos')
+            observables['gripper1_aperture'] = observables.pop('robot0_gripper_aperture')
+            observables['griper1_fingers_qpos'] = observables.pop('robot0_gripper_fingers_qpos')
+            return observables
+
+    def _setup_observables(self):
+        """
+        Sets up observables to be used for this environment. Creates object-based observables if enabled
+
+        Returns:
+            OrderedDict: Dictionary mapping observable names to its corresponding Observable object
+        """
+        observables = super()._setup_observables()
+        pf = self.robots[0].robot_model.naming_prefix
+
+
+        if self.use_object_obs:
+            modality = "object"
+            # relative position of box to eef
+            @sensor(modality=modality)
+            def box_to_eef_pos(obs_cache):
+                if "world_pose_in_gripper" not in obs_cache:
+                    return np.zeros(3)
+                box_pos = np.array(self.sim.data.body_xpos[self.obj_body_id["box"]])
+                box_quat = np.array(self.sim.data.body_xquat[self.obj_body_id["box"]])
+                box_pose = T.pose2mat((box_pos, box_quat))
+                rel_pose = T.pose_in_A_to_pose_in_B(box_pose, obs_cache["world_pose_in_gripper"])
+                rel_pos, rel_quat = T.mat2pose(rel_pose)
+                obs_cache[f"box_to_{pf}eef_quat"] = rel_quat
+                obs_cache[f"box_to_{pf}eef_pos"] = rel_pos
+                return rel_pos
+
+            # table sensors
+            @sensor(modality=modality)
+            def table_pos(obs_cache):
+                return np.array(self.table_offset)
+
+            @sensor(modality=modality)
+            def table_center_to_eef_pos(obs_cache):
+                if "world_pose_in_gripper" not in obs_cache:
+                    return np.zeros(3)
+                table_pos = np.array(self.table_offset)
+                table_quat = np.array([0, 0, 0, 1])
+                table_pose = T.pose2mat((table_pos, table_quat))
+                rel_pose = T.pose_in_A_to_pose_in_B(table_pose, obs_cache["world_pose_in_gripper"])
+                rel_pos, rel_quat = T.mat2pose(rel_pose)
+                obs_cache[f"table_center_to_{pf}eef_quat"] = rel_quat
+                obs_cache[f"table_center_to_{pf}eef_pos"] = rel_pos
+                return rel_pos
+
+            @sensor(modality=modality)
+            def table_euler_angles(obs_cache):
+                return np.array([0, 0, 0])
+
+            names = [f"box_to_{pf}eef_pos", f"table_center_to_{pf}eef_pos"]
+            sensors = [box_to_eef_pos, table_center_to_eef_pos]
+            actives = [True, True]
+
+            for name, s, active in zip(names, sensors, actives):
+                observables[name] = Observable(
+                    name=name,
+                    sensor=s,
+                    sampling_rate=self.control_freq,
+                    active=active,
+                )
+
+        observables = self.rename_observables(observables)
+        return observables
+
+    def estimate_obj1_overlap_w_obj2(self, obj1_name, obj2_name):
+        """Estimate the percent overlap between two objects' bounding boxes. For example, if obj1 is fully inside obj2, the percentage is 1.
+
+        Args:
+            obj1_name (str): name of the first object
+            obj2_name (str): name of the second object
+        Returns:
+            float: percentage of obj1's bounding box that overlaps with obj2's bounding box in [0, 1]
+        """
+        obj1 = getattr(self, obj1_name)
+        if obj1_name in ('coffee_pod_holder', 'coffee_machine_lid'):
+            obj1_id = self.sim.model.body_name2id("coffee_machine_" + obj1.root_body)
+        else:
+            obj1_id = self.sim.model.body_name2id(obj1.root_body)
+        obj1_pos = self.sim.data.body_xpos[obj1_id]
+        obj1_quat = self.sim.data.body_xquat[obj1_id]
+        obj1_half_bounding_box = obj1.get_bounding_box_half_size()
+
+        obj2 = getattr(self, obj2_name)
+        if obj2_name in ('coffee_pod_holder', 'coffee_machine_lid'):
+            obj2_id = self.sim.model.body_name2id("coffee_machine_" + obj2.root_body)
+        else:
+            obj2_id = self.sim.model.body_name2id(obj2.root_body)
+        obj2_pos = self.sim.data.body_xpos[obj2_id]
+        obj2_quat = self.sim.data.body_xquat[obj2_id]
+        obj2_half_bounding_box = obj2.get_bounding_box_half_size()
+
+        # find the min and max of obj1's bounding box in the local frame of obj2
+        obj1_bounding_box_in_obj2_frame = self.local_frame_bounding_box(obj2_pos, obj2_quat, obj1_pos, obj1_half_bounding_box, obj1_quat)
+        # find the min and max of obj2's bounding box
+        obj2_bounding_box = (-obj2_half_bounding_box[0], +obj2_half_bounding_box[0], -obj2_half_bounding_box[1], +obj2_half_bounding_box[1], -obj2_half_bounding_box[2], +obj2_half_bounding_box[2])
+        # calculate the overlap percentage. The bounding boxes are in the local frame of obj2
+        overlap_x = max(0, min(obj1_bounding_box_in_obj2_frame[1], obj2_bounding_box[1]) - max(obj1_bounding_box_in_obj2_frame[0], obj2_bounding_box[0]))
+        overlap_y = max(0, min(obj1_bounding_box_in_obj2_frame[3], obj2_bounding_box[3]) - max(obj1_bounding_box_in_obj2_frame[2], obj2_bounding_box[2]))
+        overlap_z = max(0, min(obj1_bounding_box_in_obj2_frame[5], obj2_bounding_box[5]) - max(obj1_bounding_box_in_obj2_frame[4], obj2_bounding_box[4]))
+        overlap_volume = overlap_x * overlap_y * overlap_z
+        obj1_volume = (obj1_bounding_box_in_obj2_frame[1] - obj1_bounding_box_in_obj2_frame[0]) * (obj1_bounding_box_in_obj2_frame[3] - obj1_bounding_box_in_obj2_frame[2]) * (obj1_bounding_box_in_obj2_frame[5] - obj1_bounding_box_in_obj2_frame[4])
+        return overlap_volume / obj1_volume if obj1_volume > 0 else 0.0
+
+    def local_frame_bounding_box(self, local_center, local_quat, obj_center_pos, obj_half_bounding_box, obj_quat):
+        """Calculate the bounding box of an object in a local frame.
+
+        Args:
+            local_center (array): position of the local frame's center in the global frame
+            local_quat (array): quaternion of the local frame
+            obj_center_pos (array): position of the object's center in the global frame
+            obj_half_bounding_box (array): half bounding box size of the object
+            obj_quat (array): object's quaternion
+        Returns:
+            bounding_box_local (array): (min_x, max_x, min_y, max_y, min_z, max_z) of the bounding box in the local frame
+        """
+        # Calculate eight corners of the bounding box in the object's frame
+        corners = np.array([
+            [-1, -1, -1],
+            [1, -1, -1],
+            [-1, 1, -1],
+            [1, 1, -1],
+            [-1, -1, 1],
+            [1, -1, 1],
+            [-1, 1, 1],
+            [1, 1, 1]
+        ])
+        corners = corners * obj_half_bounding_box
+        # Calculate the eight corners in the local frame
+        corners_local = np.zeros_like(corners)
+        for i, corner in enumerate(corners):
+            corners_local[i] = self.local_frame_pos(local_center, local_quat, obj_center_pos, corner, obj_quat)
+        # find the min and max of the corners in the local frame
+        min_x = np.min(corners_local[:, 0])
+        max_x = np.max(corners_local[:, 0])
+        min_y = np.min(corners_local[:, 1])
+        max_y = np.max(corners_local[:, 1])
+        min_z = np.min(corners_local[:, 2])
+        max_z = np.max(corners_local[:, 2])
+
+        bounding_box_local = np.array([min_x, max_x, min_y, max_y, min_z, max_z])
+        return bounding_box_local
+    
+    def local_frame_pos(self, local_center, local_quat, obj_center_pos, point_pos, quat):
+            """Calculate the position of a point in a local frame.
+
+            Args:
+                local_center (array): position of the local frame's center in the global frame
+                local_quat (array): quaternion of the local frame
+                obj_center_pos (array): position of the object's center in the global frame
+                point_pos (array): position of the point in the object's frame
+                quat (array): object's quaternion
+            Returns:
+                pos_local (array): position of the point in the local frame
+            """
+            # Calculate the rotation matrix of the local frame
+            local_rot = T.quat2mat(local_quat)
+
+            # Calculate the rotation matrix of the object
+            obj_rot = T.quat2mat(quat)
+
+            # Calculate the point's position in the global frame
+            pos_global = obj_rot.dot(point_pos) + obj_center_pos
+
+            # Calculate the point's position in the local frame
+            pos_local = local_rot.T.dot(pos_global - local_center)
+
+            return pos_local
+    
+    def _reset_open_lid(self):
+        """
+        Reset the environment with the coffee machine lid open.
+        """
+        SingleArmEnv._reset_internal(self)
+
+        # Open the lid by setting the hinge qpos to be 120 degrees
+        self.sim.data.qpos[self.hinge_qpos_addr] = 120. * np.pi / 180.
+        self.sim.forward()
 
 class Coffee_Drawer_Novelty_D0(Coffee_Drawer_Novelty):
     """Rename base class for convenience."""
