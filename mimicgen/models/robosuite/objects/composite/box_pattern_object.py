@@ -60,6 +60,43 @@ class BoxPatternObject(CompositeObject):
         if self.material is not None:
             self.append_material(self.material)
 
+    def _merge_layer_rectangles(self, layer):
+        """
+        Greedily merge occupied cells in a 2D layer into larger axis-aligned rectangles.
+
+        This keeps the same occupied footprint while drastically reducing the number of
+        MuJoCo geoms generated for voxelized patterns.
+        """
+        occupied = np.array(layer, dtype=bool)
+        consumed = np.zeros_like(occupied, dtype=bool)
+        rectangles = []
+
+        for i in range(occupied.shape[0]):
+            for j in range(occupied.shape[1]):
+                if not occupied[i, j] or consumed[i, j]:
+                    continue
+
+                width = 1
+                while (
+                    j + width < occupied.shape[1]
+                    and occupied[i, j + width]
+                    and not consumed[i, j + width]
+                ):
+                    width += 1
+
+                height = 1
+                while i + height < occupied.shape[0]:
+                    row = occupied[i + height, j : j + width]
+                    row_consumed = consumed[i + height, j : j + width]
+                    if not np.all(row) or np.any(row_consumed):
+                        break
+                    height += 1
+
+                consumed[i : i + height, j : j + width] = True
+                rectangles.append((i, j, height, width))
+
+        return rectangles
+
     def _get_geom_attrs(self):
         """
         Creates geom elements that will be passed to superclass CompositeObject constructor
@@ -82,20 +119,18 @@ class BoxPatternObject(CompositeObject):
         geom_names = []
         nz, nx, ny = self.pattern.shape
         for k in range(nz):
-            for i in range(nx):
-                for j in range(ny):
-                    if self.pattern[k, i, j] > 0:
-                        geom_sizes.append([
-                            self.unit_size[0], 
-                            self.unit_size[1], 
-                            self.unit_size[2],
-                        ])
-                        geom_locations.append([
-                            i * 2. * self.unit_size[0], 
-                            j * 2. * self.unit_size[1], 
-                            k * 2. * self.unit_size[2],
-                        ])
-                        geom_names.append("{}_{}_{}".format(k, i, j))
+            for rect_id, (i, j, height, width) in enumerate(self._merge_layer_rectangles(self.pattern[k] > 0)):
+                geom_sizes.append([
+                    height * self.unit_size[0],
+                    width * self.unit_size[1],
+                    self.unit_size[2],
+                ])
+                geom_locations.append([
+                    i * 2.0 * self.unit_size[0],
+                    j * 2.0 * self.unit_size[1],
+                    k * 2.0 * self.unit_size[2],
+                ])
+                geom_names.append(f"{k}_{rect_id}")
 
         # geom_rgbas = [rgba for _ in geom_locations]
         # geom_frictions = [friction for _ in geom_locations]
@@ -110,7 +145,7 @@ class BoxPatternObject(CompositeObject):
                 geom_names=geom_names[i],
                 geom_rgbas=self.rgba,
                 geom_materials=self.material.name if self.material is not None else None,
-                geom_frictions=None,
+                geom_frictions=self.friction,
             )
 
         # Add back in base args and site args
