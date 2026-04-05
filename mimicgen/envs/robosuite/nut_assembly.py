@@ -23,12 +23,12 @@ from robosuite.utils.transform_utils import quat_distance
 from mimicgen.envs.robosuite.single_arm_env_mg import SingleArmEnv_MG
 
 #region Novelty Environment 
-class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
-    """Class NutAssembly_D0_RoundPeg_Novelty
+class Nut_Assembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
+    """Class Nut_Assembly_D0_RoundPeg_Novelty
     Augments the robosuite nut assembly task for mimicgen.
     Methods:
         __init__(**kwargs):
-            Initializes the NutAssembly_D0_RoundPeg_Novelty class with a custom placement initializer.
+            Initializes the Nut_Assembly_D0_RoundPeg_Novelty class with a custom placement initializer.
         edit_model_xml(xml_str):
             Edits the model XML string to avoid conflicts in function implementation.
         _get_initial_placement_bounds():
@@ -560,7 +560,7 @@ class NutAssembly_D0_RoundPeg_Novelty(NutAssembly, SingleArmEnv_MG):
         return self.on_peg(nut_pos, peg_id)
 
 #region Pre-Novelty Environment    
-class NutAssembly_D0_Pre_Novelty(NutAssembly_D0_RoundPeg_Novelty):
+class NutAssembly_D0_Pre_Novelty(Nut_Assembly_D0_RoundPeg_Novelty):
     def _get_initial_placement_bounds(self):
         """
         Internal function to get bounds for randomization of initial placements of objects (e.g.
